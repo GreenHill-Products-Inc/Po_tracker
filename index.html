@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16,6 +16,8 @@
     --ghp-light-gray:#DDDDDB;
     --ghp-off-white:#F5F5F2;
     --ghp-white:#FFFFFF;
+    --ghp-yellow:#E5B400;
+    --ghp-red:#C0392B;
     --radius:6px;
   }
   *{box-sizing:border-box;}
@@ -56,9 +58,9 @@
   .navfoot{margin-top:auto; padding:14px 20px; font-size:11px; color:var(--ghp-mid-gray);}
   #syncdot{display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:5px; background:var(--ghp-mid-gray);}
   #syncdot.ok{background:var(--ghp-green);}
-  #syncdot.err{background:#C0392B;}
+  #syncdot.err{background:var(--ghp-red);}
 
-  main{flex:1; padding:28px 34px; max-width:1400px;}
+  main{flex:1; padding:28px 34px; max-width:1500px;}
   h1{margin:0 0 4px 0; font-size:21px; color:var(--ghp-dark-charcoal);}
   .pagesub{color:var(--ghp-mid-gray); margin-bottom:22px; font-size:13px;}
 
@@ -70,7 +72,6 @@
     margin-bottom:18px;
   }
   .grid2{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
-  .grid4{display:grid; grid-template-columns:repeat(4,1fr); gap:16px;}
   label{display:block; font-size:12px; font-weight:bold; color:var(--ghp-charcoal); margin-bottom:5px;}
   input[type=text], input[type=number], input[type=date], select, textarea{
     width:100%; padding:8px 10px; border:1px solid var(--ghp-light-gray);
@@ -99,16 +100,17 @@
   .toolbar{display:flex; gap:10px; align-items:center; margin-bottom:16px; flex-wrap:wrap;}
   .toolbar select, .toolbar input{width:auto; min-width:150px;}
 
-  table{width:100%; border-collapse:collapse; font-size:12.8px;}
+  table{width:100%; border-collapse:collapse; font-size:12.5px;}
   th{
     background:var(--ghp-green); color:var(--ghp-white); text-align:left;
-    padding:9px 10px; font-size:11.5px; text-transform:uppercase; letter-spacing:.3px;
-    position:sticky; top:0;
+    padding:9px 10px; font-size:11px; text-transform:uppercase; letter-spacing:.3px;
+    white-space:nowrap;
   }
-  td{padding:9px 10px; border-bottom:1px solid var(--ghp-light-gray);}
+  td{padding:9px 10px; border-bottom:1px solid var(--ghp-light-gray); white-space:nowrap;}
   tbody tr:nth-child(even){background:var(--ghp-off-white);}
   tbody tr:hover{background:var(--ghp-mint); cursor:pointer;}
-  tbody tr.overdue td:first-child{border-left:3px solid #C0392B;}
+  tbody tr.sem-red td:first-child{border-left:3px solid var(--ghp-red);}
+  tbody tr.sem-yellow td:first-child{border-left:3px solid var(--ghp-yellow);}
   .tablewrap{overflow-x:auto; border:1px solid var(--ghp-light-gray); border-radius:var(--radius);}
 
   .badge{
@@ -118,7 +120,14 @@
   .badge.DELIVERED{background:var(--ghp-mint); color:var(--ghp-deep-green);}
   .badge.PARTIAL{background:#FCEFCB; color:#8A6D00;}
   .badge.BACKORDER{background:#F8D7D3; color:#B0281A;}
-  .overduetag{color:#C0392B; font-weight:bold; font-size:11px;}
+
+  .light{display:flex; align-items:center; gap:6px; font-size:12px; white-space:nowrap;}
+  .dot{width:10px; height:10px; border-radius:50%; flex-shrink:0; display:inline-block;}
+  .dot.green{background:var(--ghp-green);}
+  .dot.yellow{background:var(--ghp-yellow);}
+  .dot.red{background:var(--ghp-red);}
+  .dot.off{background:var(--ghp-light-gray); border:1px solid var(--ghp-mid-gray);}
+  .dot.none{background:var(--ghp-white); border:1px solid var(--ghp-mid-gray);}
 
   .modal-bg{
     display:none; position:fixed; inset:0; background:rgba(0,0,0,.45);
@@ -130,6 +139,8 @@
   }
   .modal h2{margin-top:0; font-size:17px;}
   .modal-actions{display:flex; justify-content:flex-end; gap:10px; margin-top:20px; border-top:1px solid var(--ghp-light-gray); padding-top:16px;}
+  .modal-status-line{display:flex; align-items:center; gap:8px; background:var(--ghp-off-white); border-radius:4px; padding:10px 12px; margin-bottom:18px; font-size:13px;}
+  .modal-status-line .lbl{color:var(--ghp-mid-gray); font-size:11px; text-transform:uppercase; letter-spacing:.3px;}
 
   .banner{padding:10px 14px; border-radius:4px; font-size:13px; margin-bottom:16px;}
   .banner.error{background:#F8D7D3; color:#8A1F14; border:1px solid #E9A79E;}
@@ -151,21 +162,21 @@
       <div class="name">GreenHill Products</div>
       <div class="sub">PO Tracker</div>
     </div>
-    <button class="navbtn active" data-tab="nueva">＋ Nueva orden</button>
-    <button class="navbtn" data-tab="tablero">▤ Tablero</button>
+    <button class="navbtn active" data-tab="new">+ New PO</button>
+    <button class="navbtn" data-tab="dashboard">▤ Dashboard</button>
     <button class="navbtn" data-tab="vendors">⚑ Vendors</button>
-    <button class="navbtn" data-tab="config">⚙ Configuración</button>
-    <div class="navfoot"><span id="syncdot"></span><span id="syncstate">Sin conectar</span></div>
+    <button class="navbtn" data-tab="settings">⚙ Settings</button>
+    <div class="navfoot"><span id="syncdot"></span><span id="syncstate">Not connected</span></div>
   </nav>
 
   <main>
-    <!-- NUEVA ORDEN -->
-    <section id="tab-nueva">
-      <h1>Nueva orden de compra</h1>
-      <div class="pagesub">Se guarda directo en la hoja de cálculo conectada.</div>
-      <div id="banner-nueva"></div>
+    <!-- NEW PO -->
+    <section id="tab-new">
+      <h1>Create new PO</h1>
+      <div class="pagesub">This saves directly to your connected spreadsheet.</div>
+      <div id="banner-new"></div>
       <div class="card">
-        <form id="form-nueva">
+        <form id="form-new">
           <div class="grid2">
             <div class="field"><label>Customer</label><input type="text" id="f-customer" required></div>
             <div class="field"><label>Address</label><input type="text" id="f-address" required></div>
@@ -178,80 +189,82 @@
             <div class="field">
               <label>Vendor</label>
               <select id="f-vendor" required></select>
-              <div class="hint"><button type="button" class="link" id="btn-open-newvendor">+ Agregar vendor nuevo</button></div>
+              <div class="hint"><button type="button" class="link" id="btn-open-newvendor">+ Add new vendor</button></div>
             </div>
             <div class="field">
-              <label>PO Number (automático)</label>
+              <label>PO Number (automatic)</label>
               <input type="text" id="f-ponumber" disabled>
             </div>
           </div>
           <div class="grid2">
             <div class="field"><label>PO Creation Date</label><input type="text" id="f-creationdate" disabled></div>
-            <div class="field"><label>Vendor Lead Time — ETA estimada</label><input type="text" id="f-leadtime" disabled></div>
+            <div class="field"><label>Vendor Lead Time — estimated ETA</label><input type="text" id="f-leadtime" disabled></div>
           </div>
-          <button type="submit" class="primary" id="btn-submit-po">Crear orden</button>
+          <button type="submit" class="primary" id="btn-submit-po">Create PO</button>
         </form>
       </div>
     </section>
 
-    <!-- TABLERO -->
-    <section id="tab-tablero" style="display:none;">
-      <h1>Tablero de órdenes</h1>
-      <div class="pagesub">Haz clic en una fila para actualizar confirmación, entrega, facturas y estado.</div>
-      <div id="banner-tablero"></div>
+    <!-- DASHBOARD -->
+    <section id="tab-dashboard" style="display:none;">
+      <h1>PO Dashboard</h1>
+      <div class="pagesub">Click a row to update confirmation, delivery, invoices and status.</div>
+      <div id="banner-dashboard"></div>
       <div class="toolbar">
-        <input type="text" id="filter-search" placeholder="Buscar customer o PO number...">
-        <select id="filter-status">
-          <option value="">Todos los status</option>
+        <input type="text" id="filter-search" placeholder="Search customer or PO number...">
+        <select id="filter-statuspo">
+          <option value="">All Status PO</option>
           <option value="PENDING">PENDING</option>
           <option value="DELIVERED">DELIVERED</option>
           <option value="PARTIAL">PARTIAL</option>
           <option value="BACKORDER">BACKORDER</option>
         </select>
-        <select id="filter-vendor"><option value="">Todos los vendors</option></select>
+        <select id="filter-vendor"><option value="">All vendors</option></select>
         <label style="display:flex;align-items:center;gap:6px;font-weight:normal;font-size:12.5px;color:var(--ghp-charcoal);margin:0;">
-          <input type="checkbox" id="filter-overdue" style="width:auto;"> Solo atrasadas
+          <input type="checkbox" id="filter-overdue" style="width:auto;"> Overdue only
         </label>
-        <button class="secondary" id="btn-refresh">↻ Actualizar</button>
+        <button class="secondary" id="btn-refresh">↻ Refresh</button>
       </div>
       <div class="tablewrap">
         <table>
           <thead>
             <tr>
-              <th>PO Number</th><th>Customer</th><th>Vendor</th><th>Creación</th>
-              <th>ETA estimada</th><th>Status</th><th>Cost</th><th>Debt</th>
+              <th>Customer</th><th>Address</th><th>Lot / House</th><th>Phases</th><th>Vendor</th>
+              <th>PO Number</th><th>PO Creation Date</th><th>Vendor Lead Time</th><th>PO Confirmation ETA</th>
+              <th>Status</th><th>Actual Delivery Time</th><th>Estimated Overdue</th><th>Real Delivery Time</th>
+              <th>Status PO</th><th>Description</th>
             </tr>
           </thead>
           <tbody id="table-body"></tbody>
         </table>
       </div>
-      <div id="table-empty" class="empty" style="display:none;">No hay órdenes que coincidan con el filtro.</div>
+      <div id="table-empty" class="empty" style="display:none;">No orders match this filter.</div>
     </section>
 
     <!-- VENDORS -->
     <section id="tab-vendors" style="display:none;">
       <h1>Vendors</h1>
-      <div class="pagesub">Lead time en días — se usa para calcular la ETA automática de cada orden.</div>
+      <div class="pagesub">Lead time in days — used to auto-calculate each order's ETA.</div>
       <div id="banner-vendors"></div>
       <div class="card">
-        <div class="section-title">Agregar vendor</div>
+        <div class="section-title">Add vendor</div>
         <form id="form-vendor" class="grid2" style="align-items:end;">
-          <div class="field" style="margin-bottom:0;"><label>Nombre del vendor</label><input type="text" id="v-name" required></div>
-          <div class="field" style="margin-bottom:0;"><label>Lead time (días)</label><input type="number" id="v-leadtime" min="0" required></div>
-          <div style="grid-column:1/-1; margin-top:14px;"><button type="submit" class="primary">Agregar vendor</button></div>
+          <div class="field" style="margin-bottom:0;"><label>Vendor name</label><input type="text" id="v-name" required></div>
+          <div class="field" style="margin-bottom:0;"><label>Lead time (days)</label><input type="number" id="v-leadtime" min="0" required></div>
+          <div style="grid-column:1/-1; margin-top:14px;"><button type="submit" class="primary">Add vendor</button></div>
         </form>
       </div>
       <div class="card">
-        <div class="section-title">Vendors actuales</div>
+        <div class="section-title">Current vendors</div>
         <div id="vendor-list"></div>
       </div>
     </section>
 
-    <!-- CONFIG -->
-    <section id="tab-config" style="display:none;">
-      <h1>Configuración</h1>
-      <div class="pagesub">Pega aquí la URL de tu Google Apps Script (Implementación web).</div>
-      <div id="banner-config"></div>
+    <!-- SETTINGS -->
+    <section id="tab-settings" style="display:none;">
+      <h1>Settings</h1>
+      <div class="pagesub">Paste your Google Apps Script (Web app deployment) URL here.</div>
+      <div id="banner-settings"></div>
       <div class="card">
         <div class="field">
           <label>Read URL</label>
@@ -260,28 +273,32 @@
         <div class="field">
           <label>Write URL</label>
           <input type="text" id="cfg-write" placeholder="https://script.google.com/macros/s/XXXXXXXX/exec">
-          <div class="hint">Con Google Sheets, normalmente es la misma URL en ambos campos.</div>
+          <div class="hint">With Google Sheets, this is usually the same URL in both fields.</div>
         </div>
         <div style="display:flex; gap:10px;">
-          <button class="primary" id="btn-save-config">Guardar y conectar</button>
-          <button class="secondary" id="btn-test-config">Probar conexión</button>
-          <button class="secondary" id="btn-open-url">Abrir URL en pestaña nueva</button>
+          <button class="primary" id="btn-save-config">Save & Connect</button>
+          <button class="secondary" id="btn-test-config">Test Connection</button>
+          <button class="secondary" id="btn-open-url">Open URL in new tab</button>
         </div>
       </div>
     </section>
   </main>
 </div>
 
-<!-- MODAL EDITAR PO -->
+<!-- MODAL EDIT PO -->
 <div class="modal-bg" id="modal-bg">
   <div class="modal">
-    <h2>Actualizar orden <span id="modal-ponum" class="ponum"></span></h2>
+    <h2>Update PO <span id="modal-ponum" class="ponum"></span></h2>
+    <div class="modal-status-line">
+      <span class="lbl">Status (auto):</span>
+      <span class="light" id="modal-status-light"><span class="dot none"></span><span>—</span></span>
+    </div>
     <form id="form-edit">
       <div class="grid2">
         <div class="field"><label>PO Confirmation ETA</label><input type="date" id="e-confeta"></div>
         <div class="field">
-          <label>Status</label>
-          <select id="e-status">
+          <label>Status PO</label>
+          <select id="e-statuspo">
             <option value="PENDING">PENDING</option>
             <option value="DELIVERED">DELIVERED</option>
             <option value="PARTIAL">PARTIAL</option>
@@ -290,17 +307,20 @@
         </div>
       </div>
       <div class="grid2">
-        <div class="field"><label>Actual Delivery Time</label><input type="date" id="e-actualdelivery"></div>
+        <div class="field">
+          <label>Actual Delivery Time</label>
+          <input type="date" id="e-actualdelivery">
+          <div class="hint">Only needed if the original ETA changes and a new delivery date must be set.</div>
+        </div>
         <div class="field"><label>Real Delivery Time</label><input type="date" id="e-realdelivery"></div>
       </div>
-      <div class="field"><label>Status PO</label><input type="text" id="e-statuspo"></div>
       <div class="grid2">
         <div class="field"><label>Description</label><input type="text" id="e-description"></div>
         <div class="field"><label>Cost of PO</label><input type="number" step="0.01" id="e-cost"></div>
       </div>
       <div class="field"><label>Notes</label><textarea id="e-notes"></textarea></div>
 
-      <div class="section-title">Facturas</div>
+      <div class="section-title">Invoices</div>
       <div class="invoicegrid">
         <div class="field"><label>Description 2</label><input type="text" id="e-desc2"></div>
         <div class="field"><label>Invoice 1</label><input type="text" id="e-inv1"></div>
@@ -316,23 +336,23 @@
         <div class="field"><label>Debt</label><input type="number" step="0.01" id="e-debt"></div>
       </div>
       <div class="modal-actions">
-        <button type="button" class="secondary" id="btn-cancel-edit">Cancelar</button>
-        <button type="submit" class="primary">Guardar cambios</button>
+        <button type="button" class="secondary" id="btn-cancel-edit">Cancel</button>
+        <button type="submit" class="primary">Save changes</button>
       </div>
     </form>
   </div>
 </div>
 
-<!-- MODAL NUEVO VENDOR (desde formulario de orden) -->
+<!-- MODAL NEW VENDOR (from PO form) -->
 <div class="modal-bg" id="modal-vendor-bg">
   <div class="modal" style="max-width:420px;">
-    <h2>Agregar vendor nuevo</h2>
+    <h2>Add new vendor</h2>
     <form id="form-quick-vendor">
-      <div class="field"><label>Nombre del vendor</label><input type="text" id="qv-name" required></div>
-      <div class="field"><label>Lead time (días)</label><input type="number" min="0" id="qv-leadtime" required></div>
+      <div class="field"><label>Vendor name</label><input type="text" id="qv-name" required></div>
+      <div class="field"><label>Lead time (days)</label><input type="number" min="0" id="qv-leadtime" required></div>
       <div class="modal-actions">
-        <button type="button" class="secondary" id="btn-cancel-vendor">Cancelar</button>
-        <button type="submit" class="primary">Agregar</button>
+        <button type="button" class="secondary" id="btn-cancel-vendor">Cancel</button>
+        <button type="submit" class="primary">Add</button>
       </div>
     </form>
   </div>
@@ -343,6 +363,7 @@ let config = { readUrl:'', writeUrl:'' };
 let pos = [];
 let vendors = [];
 let editingPoNumber = null;
+let lastFetchError = '';
 
 // ---------- storage ----------
 async function loadConfig(){
@@ -356,15 +377,15 @@ async function persistConfig(){
 }
 
 // ---------- sync status ----------
-function setSync(state, msg){
+function setSync(state){
   const dot = document.getElementById('syncdot');
   const label = document.getElementById('syncstate');
   dot.className = state === 'ok' ? 'ok' : (state === 'err' ? 'err' : '');
-  const now = new Date().toLocaleTimeString('es-CO', {hour:'2-digit', minute:'2-digit'});
-  if(state==='ok') label.textContent = 'Conectado · ' + now;
-  else if(state==='err') label.textContent = 'Error de conexión';
-  else if(state==='loading') label.textContent = 'Sincronizando...';
-  else label.textContent = msg || 'Sin conectar';
+  const now = new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'});
+  if(state==='ok') label.textContent = 'Connected · ' + now;
+  else if(state==='err') label.textContent = 'Connection error';
+  else if(state==='loading') label.textContent = 'Syncing...';
+  else label.textContent = 'Not connected';
 }
 function showBanner(tabId, type, text){
   const el = document.getElementById('banner-' + tabId);
@@ -374,8 +395,6 @@ function showBanner(tabId, type, text){
 }
 
 // ---------- data fetch ----------
-let lastFetchError = '';
-
 async function fetchData(){
   if(!config.readUrl){ setSync('idle'); return; }
   setSync('loading');
@@ -390,22 +409,20 @@ async function fetchData(){
     renderAll();
   }catch(e){
     let detail = e.message || String(e);
-    // Diagnóstico extra: probamos sin CORS solo para saber si el bloqueo es de política CORS
-    // (el servidor sí responde) o algo más de fondo (la conexión ni siquiera llega).
     try{
       await fetch(config.readUrl, { method:'GET', mode:'no-cors' });
-      detail += ' | Diagnóstico: el servidor SÍ responde — es un bloqueo de política CORS del lado de Google, no de red.';
+      detail += ' | Diagnostic: the server DID respond — this is a CORS policy block, not a network block.';
     }catch(e2){
-      detail += ' | Diagnóstico: la conexión no llega ni siquiera sin CORS — puede ser un bloqueo de red, no de CORS.';
+      detail += ' | Diagnostic: the connection did not go through even without CORS — this may be a network block.';
     }
     lastFetchError = detail;
     setSync('err');
-    showBanner('tablero', 'error', 'No se pudo leer la hoja. Revisa la Read URL en Configuración. (' + detail + ')');
+    showBanner('dashboard', 'error', 'Could not read the spreadsheet. Check the Read URL in Settings. (' + detail + ')');
   }
 }
 
 async function writeData(payload){
-  if(!config.writeUrl){ throw new Error('Falta configurar la Write URL.'); }
+  if(!config.writeUrl){ throw new Error('Write URL is not configured.'); }
   const res = await fetch(config.writeUrl, {
     method:'POST',
     headers:{'Content-Type':'text/plain;charset=utf-8'},
@@ -422,9 +439,9 @@ function todayISO(){
 }
 function fmtDate(iso){
   if(!iso) return '—';
-  const d = new Date(iso + (iso.length<=10 ? 'T00:00:00' : ''));
+  const d = new Date(iso + (String(iso).length<=10 ? 'T00:00:00' : ''));
   if(isNaN(d)) return iso;
-  return d.toLocaleDateString('es-CO', {day:'2-digit', month:'2-digit', year:'numeric'});
+  return d.toLocaleDateString('en-US', {day:'2-digit', month:'2-digit', year:'numeric'});
 }
 function nextPoNumber(){
   const d = new Date();
@@ -448,13 +465,42 @@ function calcLeadTimeDate(vendorName){
   d.setDate(d.getDate() + days);
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 }
-function isOverdue(po){
-  if(!po.VENDOR_LEAD_TIME) return false;
-  if(po.STATUS === 'DELIVERED') return false;
-  const eta = new Date(po.VENDOR_LEAD_TIME + 'T00:00:00');
+
+// Traffic-light Status: based on days remaining until PO_CONFIRMATION_ETA.
+// >=3 days => green, 0-2 days => yellow, already passed => red, DELIVERED => off.
+function computeStatusLight(po){
+  if(String(po.STATUS_PO || '').toUpperCase() === 'DELIVERED'){
+    return { level:'off', label:'Delivered' };
+  }
+  if(!po.PO_CONFIRMATION_ETA){
+    return { level:'none', label:'Awaiting confirmation' };
+  }
+  const eta = new Date(po.PO_CONFIRMATION_ETA + 'T00:00:00');
   const today = new Date(); today.setHours(0,0,0,0);
-  return eta < today;
+  const diffDays = Math.round((eta - today) / 86400000);
+  if(diffDays < 0) return { level:'red', label:'Overdue' };
+  if(diffDays <= 2) return { level:'yellow', label:'Due soon' };
+  return { level:'green', label:'On track' };
 }
+function lightHtml(light){
+  return '<span class="light"><span class="dot ' + light.level + '"></span><span>' + esc(light.label) + '</span></span>';
+}
+
+// Estimated Overdue: difference in days between Vendor Lead Time (expected) and Real Delivery Time (actual)
+function computeOverdueDays(po){
+  if(!po.REAL_DELIVERY_TIME || !po.VENDOR_LEAD_TIME) return '';
+  const expected = new Date(po.VENDOR_LEAD_TIME + 'T00:00:00');
+  const actual = new Date(po.REAL_DELIVERY_TIME + 'T00:00:00');
+  if(isNaN(expected) || isNaN(actual)) return '';
+  return Math.round((actual - expected) / 86400000);
+}
+function formatOverdue(n){
+  if(n === '' || n === null || n === undefined || isNaN(n)) return '—';
+  if(n > 0) return '+' + n + 'd late';
+  if(n < 0) return Math.abs(n) + 'd early';
+  return 'On time';
+}
+
 function esc(s){
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -471,35 +517,35 @@ function renderAll(){
 function renderVendorSelect(){
   const sel = document.getElementById('f-vendor');
   const current = sel.value;
-  sel.innerHTML = '<option value="">Selecciona un vendor...</option>' +
-    vendors.map(v => '<option value="' + esc(v.VENDOR_NAME) + '">' + esc(v.VENDOR_NAME) + ' (' + esc(v.LEAD_TIME_DAYS) + ' días)</option>').join('');
+  sel.innerHTML = '<option value="">Select a vendor...</option>' +
+    vendors.map(v => '<option value="' + esc(v.VENDOR_NAME) + '">' + esc(v.VENDOR_NAME) + ' (' + esc(v.LEAD_TIME_DAYS) + ' days)</option>').join('');
   if(current) sel.value = current;
 }
 function renderVendorFilterSelect(){
   const sel = document.getElementById('filter-vendor');
   const current = sel.value;
-  sel.innerHTML = '<option value="">Todos los vendors</option>' +
+  sel.innerHTML = '<option value="">All vendors</option>' +
     vendors.map(v => '<option value="' + esc(v.VENDOR_NAME) + '">' + esc(v.VENDOR_NAME) + '</option>').join('');
   sel.value = current;
 }
 function renderVendorList(){
   const el = document.getElementById('vendor-list');
-  if(vendors.length === 0){ el.innerHTML = '<div class="empty">Aún no hay vendors. Agrega el primero arriba.</div>'; return; }
+  if(vendors.length === 0){ el.innerHTML = '<div class="empty">No vendors yet. Add the first one above.</div>'; return; }
   el.innerHTML = vendors.map(v =>
-    '<div class="vendorrow"><div><strong>' + esc(v.VENDOR_NAME) + '</strong></div><div>' + esc(v.LEAD_TIME_DAYS) + ' días de lead time</div></div>'
+    '<div class="vendorrow"><div><strong>' + esc(v.VENDOR_NAME) + '</strong></div><div>' + esc(v.LEAD_TIME_DAYS) + ' days lead time</div></div>'
   ).join('');
 }
 
 function renderTable(){
   const search = document.getElementById('filter-search').value.trim().toLowerCase();
-  const statusF = document.getElementById('filter-status').value;
+  const statusPoF = document.getElementById('filter-statuspo').value;
   const vendorF = document.getElementById('filter-vendor').value;
   const overdueOnly = document.getElementById('filter-overdue').checked;
 
   let rows = pos.filter(p => {
-    if(statusF && p.STATUS !== statusF) return false;
+    if(statusPoF && p.STATUS_PO !== statusPoF) return false;
     if(vendorF && p.VENDOR !== vendorF) return false;
-    if(overdueOnly && !isOverdue(p)) return false;
+    if(overdueOnly && computeStatusLight(p).level !== 'red') return false;
     if(search){
       const hay = (String(p.CUSTOMER||'') + ' ' + String(p.PO_NUMBER||'')).toLowerCase();
       if(!hay.includes(search)) return false;
@@ -518,17 +564,26 @@ function renderTable(){
   emptyEl.style.display = 'none';
 
   tbody.innerHTML = rows.map(p => {
-    const overdue = isOverdue(p);
-    const status = p.STATUS || 'PENDING';
-    return '<tr class="' + (overdue ? 'overdue' : '') + '" data-po="' + esc(p.PO_NUMBER) + '">' +
-      '<td class="ponum">' + esc(p.PO_NUMBER) + '</td>' +
+    const light = computeStatusLight(p);
+    const statusPo = p.STATUS_PO || 'PENDING';
+    const overdueDays = computeOverdueDays(p);
+    const rowClass = light.level === 'red' ? 'sem-red' : (light.level === 'yellow' ? 'sem-yellow' : '');
+    return '<tr class="' + rowClass + '" data-po="' + esc(p.PO_NUMBER) + '">' +
       '<td>' + esc(p.CUSTOMER) + '</td>' +
+      '<td>' + esc(p.ADDRESS) + '</td>' +
+      '<td>' + esc(p.LOT_HOUSE) + '</td>' +
+      '<td>' + esc(p.PHASES) + '</td>' +
       '<td>' + esc(p.VENDOR) + '</td>' +
+      '<td class="ponum">' + esc(p.PO_NUMBER) + '</td>' +
       '<td>' + fmtDate(p.PO_CREATION_DATE) + '</td>' +
-      '<td>' + fmtDate(p.VENDOR_LEAD_TIME) + (overdue ? '<div class="overduetag">ATRASADA</div>' : '') + '</td>' +
-      '<td><span class="badge ' + esc(status) + '">' + esc(status) + '</span></td>' +
-      '<td>' + (p.COST_OF_PO ? esc(p.COST_OF_PO) : '—') + '</td>' +
-      '<td>' + (p.DEBT ? esc(p.DEBT) : '—') + '</td>' +
+      '<td>' + fmtDate(p.VENDOR_LEAD_TIME) + '</td>' +
+      '<td>' + fmtDate(p.PO_CONFIRMATION_ETA) + '</td>' +
+      '<td>' + lightHtml(light) + '</td>' +
+      '<td>' + fmtDate(p.ACTUAL_DELIVERY_TIME) + '</td>' +
+      '<td>' + formatOverdue(overdueDays) + '</td>' +
+      '<td>' + fmtDate(p.REAL_DELIVERY_TIME) + '</td>' +
+      '<td><span class="badge ' + esc(statusPo) + '">' + esc(statusPo) + '</span></td>' +
+      '<td>' + esc(p.DESCRIPTION || '—') + '</td>' +
       '</tr>';
   }).join('');
 
@@ -551,10 +606,10 @@ function updateLeadTimePreview(){
 // ---------- new PO ----------
 document.getElementById('f-vendor').addEventListener('change', updateLeadTimePreview);
 
-document.getElementById('form-nueva').addEventListener('submit', async (e) => {
+document.getElementById('form-new').addEventListener('submit', async (e) => {
   e.preventDefault();
   const vendorName = document.getElementById('f-vendor').value;
-  if(!vendorName){ showBanner('nueva','error','Selecciona un vendor.'); return; }
+  if(!vendorName){ showBanner('new','error','Please select a vendor.'); return; }
   const btn = document.getElementById('btn-submit-po');
   btn.disabled = true;
   const po = {
@@ -566,15 +621,15 @@ document.getElementById('form-nueva').addEventListener('submit', async (e) => {
     PO_NUMBER: document.getElementById('f-ponumber').value,
     PO_CREATION_DATE: todayISO(),
     VENDOR_LEAD_TIME: calcLeadTimeDate(vendorName),
-    STATUS: 'PENDING'
+    STATUS_PO: 'PENDING'
   };
   try{
     await writeData({ action:'addPo', po });
-    showBanner('nueva','info','Orden ' + po.PO_NUMBER + ' creada correctamente.');
-    document.getElementById('form-nueva').reset();
+    showBanner('new','info','PO ' + po.PO_NUMBER + ' created successfully.');
+    document.getElementById('form-new').reset();
     await fetchData();
   }catch(err){
-    showBanner('nueva','error','No se pudo crear la orden: ' + err.message);
+    showBanner('new','error','Could not create PO: ' + err.message);
   }finally{
     btn.disabled = false;
   }
@@ -599,7 +654,7 @@ document.getElementById('form-quick-vendor').addEventListener('submit', async (e
     document.getElementById('f-vendor').value = name;
     updateLeadTimePreview();
   }catch(err){
-    alert('No se pudo agregar el vendor: ' + err.message);
+    alert('Could not add vendor: ' + err.message);
   }
 });
 
@@ -610,11 +665,11 @@ document.getElementById('form-vendor').addEventListener('submit', async (e) => {
   const leadtime = document.getElementById('v-leadtime').value;
   try{
     await writeData({ action:'addVendor', vendor:{ VENDOR_NAME:name, LEAD_TIME_DAYS:leadtime } });
-    showBanner('vendors','info','Vendor agregado.');
+    showBanner('vendors','info','Vendor added.');
     document.getElementById('form-vendor').reset();
     await fetchData();
   }catch(err){
-    showBanner('vendors','error','No se pudo agregar el vendor: ' + err.message);
+    showBanner('vendors','error','Could not add vendor: ' + err.message);
   }
 });
 
@@ -624,11 +679,13 @@ function openEditModal(poNumber){
   if(!po) return;
   editingPoNumber = poNumber;
   document.getElementById('modal-ponum').textContent = poNumber;
+  const light = computeStatusLight(po);
+  document.getElementById('modal-status-light').innerHTML =
+    '<span class="dot ' + light.level + '"></span><span>' + esc(light.label) + '</span>';
   document.getElementById('e-confeta').value = po.PO_CONFIRMATION_ETA || '';
-  document.getElementById('e-status').value = po.STATUS || 'PENDING';
+  document.getElementById('e-statuspo').value = po.STATUS_PO || 'PENDING';
   document.getElementById('e-actualdelivery').value = po.ACTUAL_DELIVERY_TIME || '';
   document.getElementById('e-realdelivery').value = po.REAL_DELIVERY_TIME || '';
-  document.getElementById('e-statuspo').value = po.STATUS_PO || '';
   document.getElementById('e-description').value = po.DESCRIPTION || '';
   document.getElementById('e-cost').value = po.COST_OF_PO || '';
   document.getElementById('e-notes').value = po.NOTES || '';
@@ -649,13 +706,16 @@ document.getElementById('btn-cancel-edit').addEventListener('click', () => {
 });
 document.getElementById('form-edit').addEventListener('submit', async (e) => {
   e.preventDefault();
+  const original = pos.find(p => String(p.PO_NUMBER) === String(editingPoNumber)) || {};
+  const realDelivery = document.getElementById('e-realdelivery').value;
+  const overdueDays = computeOverdueDays({ VENDOR_LEAD_TIME: original.VENDOR_LEAD_TIME, REAL_DELIVERY_TIME: realDelivery });
   const po = {
     PO_NUMBER: editingPoNumber,
     PO_CONFIRMATION_ETA: document.getElementById('e-confeta').value,
-    STATUS: document.getElementById('e-status').value,
-    ACTUAL_DELIVERY_TIME: document.getElementById('e-actualdelivery').value,
-    REAL_DELIVERY_TIME: document.getElementById('e-realdelivery').value,
     STATUS_PO: document.getElementById('e-statuspo').value,
+    ACTUAL_DELIVERY_TIME: document.getElementById('e-actualdelivery').value,
+    REAL_DELIVERY_TIME: realDelivery,
+    ESTIMATED_OVERDUE: overdueDays,
     DESCRIPTION: document.getElementById('e-description').value,
     COST_OF_PO: document.getElementById('e-cost').value,
     NOTES: document.getElementById('e-notes').value,
@@ -675,43 +735,44 @@ document.getElementById('form-edit').addEventListener('submit', async (e) => {
     document.getElementById('modal-bg').classList.remove('show');
     await fetchData();
   }catch(err){
-    alert('No se pudo guardar: ' + err.message);
+    alert('Could not save: ' + err.message);
   }
 });
 
 // ---------- filters ----------
-['filter-search','filter-status','filter-vendor','filter-overdue'].forEach(id => {
+['filter-search','filter-statuspo','filter-vendor','filter-overdue'].forEach(id => {
   document.getElementById(id).addEventListener('input', renderTable);
   document.getElementById(id).addEventListener('change', renderTable);
 });
 document.getElementById('btn-refresh').addEventListener('click', fetchData);
 
-// ---------- config ----------
-document.getElementById('btn-save-config').addEventListener('click', async () => {
-  config.readUrl = document.getElementById('cfg-read').value.trim();
-  config.writeUrl = document.getElementById('cfg-write').value.trim();
-  await persistConfig();
-  showBanner('config','info','Configuración guardada. Conectando...');
-  await fetchData();
-  if(document.getElementById('syncstate').textContent.startsWith('Conectado')){
-    showBanner('config','info','Conectado correctamente.');
-  }else{
-    showBanner('config','error','Guardado, pero no se pudo conectar. Detalle del error: "' + lastFetchError + '".');
-  }
-});
+// ---------- settings ----------
 document.getElementById('btn-open-url').addEventListener('click', () => {
   const url = document.getElementById('cfg-read').value.trim();
-  if(!url){ alert('Primero escribe o pega la Read URL.'); return; }
+  if(!url){ alert('First type or paste the Read URL.'); return; }
   window.open(url, '_blank');
 });
 
 document.getElementById('btn-test-config').addEventListener('click', async () => {
-  showBanner('config','warn','Probando conexión...');
+  showBanner('settings','warn','Testing connection...');
   await fetchData();
-  if(document.getElementById('syncstate').textContent.startsWith('Conectado')){
-    showBanner('config','info','Conexión exitosa. Se leyeron ' + pos.length + ' órdenes y ' + vendors.length + ' vendors.');
+  if(document.getElementById('syncstate').textContent.startsWith('Connected')){
+    showBanner('settings','info','Connection successful. Loaded ' + pos.length + ' POs and ' + vendors.length + ' vendors.');
   }else{
-    showBanner('config','error','No se pudo conectar. Detalle del error: "' + lastFetchError + '". Revisa la URL y que el acceso esté en "Cualquier usuario".');
+    showBanner('settings','error','Could not connect. Error detail: "' + lastFetchError + '". Check the URL and that access is set to "Anyone".');
+  }
+});
+
+document.getElementById('btn-save-config').addEventListener('click', async () => {
+  config.readUrl = document.getElementById('cfg-read').value.trim();
+  config.writeUrl = document.getElementById('cfg-write').value.trim();
+  await persistConfig();
+  showBanner('settings','info','Settings saved. Connecting...');
+  await fetchData();
+  if(document.getElementById('syncstate').textContent.startsWith('Connected')){
+    showBanner('settings','info','Connected successfully.');
+  }else{
+    showBanner('settings','error','Saved, but could not connect. Error detail: "' + lastFetchError + '".');
   }
 });
 
@@ -733,14 +794,14 @@ document.querySelectorAll('.navbtn').forEach(btn => {
   if(config.readUrl){
     await fetchData();
   }else{
-    setSync('idle', 'Configura tus URLs en Configuración');
+    setSync('idle');
     document.querySelectorAll('.navbtn').forEach(b=>b.classList.remove('active'));
-    document.querySelector('[data-tab="config"]').classList.add('active');
+    document.querySelector('[data-tab="settings"]').classList.add('active');
     document.querySelectorAll('main > section').forEach(s => s.style.display = 'none');
-    document.getElementById('tab-config').style.display = 'block';
-    showBanner('config','warn','Aún no has conectado tu hoja. Pega la URL de tu Google Apps Script y guarda.');
+    document.getElementById('tab-settings').style.display = 'block';
+    showBanner('settings','warn','You haven\'t connected your spreadsheet yet. Paste your Google Apps Script URL and save.');
   }
-  setInterval(fetchData, 180000); // auto-refresh cada 3 min
+  setInterval(fetchData, 180000); // auto-refresh every 3 min
 })();
 </script>
 </body>
