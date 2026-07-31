@@ -359,21 +359,34 @@
 </div>
 
 <script>
-let config = { readUrl:'', writeUrl:'' };
+// Default Apps Script Web App URL — baked into the file so a fresh deploy
+// (or a browser with no saved settings) is already connected out of the box.
+// You can still change it later from the Settings tab; that override is
+// remembered in this browser and takes priority over the default below.
+const DEFAULT_READ_URL = 'https://script.google.com/macros/s/AKfycbzt6zbWjq5PLrXvXe8Nwf5sCfLFPuTEq07y3XoBVwNZ24tpzNMbT_3oSB1GmMBOpXvP/exec';
+const DEFAULT_WRITE_URL = 'https://script.google.com/macros/s/AKfycbzt6zbWjq5PLrXvXe8Nwf5sCfLFPuTEq07y3XoBVwNZ24tpzNMbT_3oSB1GmMBOpXvP/exec';
+
+let config = { readUrl: DEFAULT_READ_URL, writeUrl: DEFAULT_WRITE_URL };
 let pos = [];
 let vendors = [];
 let editingPoNumber = null;
 let lastFetchError = '';
 
 // ---------- storage ----------
-async function loadConfig(){
+function loadConfig(){
   try{
-    const res = await window.storage.get('po_tracker_config', false);
-    if(res && res.value){ config = JSON.parse(res.value); }
-  }catch(e){ /* no config saved yet */ }
+    const raw = localStorage.getItem('po_tracker_config');
+    if(raw){
+      const saved = JSON.parse(raw);
+      if(saved.readUrl) config.readUrl = saved.readUrl;
+      if(saved.writeUrl) config.writeUrl = saved.writeUrl;
+    }
+  }catch(e){ /* no saved override, or localStorage unavailable - default stays */ }
 }
-async function persistConfig(){
-  await window.storage.set('po_tracker_config', JSON.stringify(config), false);
+function persistConfig(){
+  try{
+    localStorage.setItem('po_tracker_config', JSON.stringify(config));
+  }catch(e){ /* localStorage unavailable - config just won't persist across reloads */ }
 }
 
 // ---------- sync status ----------
@@ -789,9 +802,10 @@ document.querySelectorAll('.navbtn').forEach(btn => {
 // ---------- init ----------
 (async function init(){
   await loadConfig();
-  document.getElementById('cfg-read').value = config.readUrl || '';
-  document.getElementById('cfg-write').value = config.writeUrl || '';
-  if(config.readUrl){
+  const isConfigured = config.readUrl && !config.readUrl.includes('PASTE_YOUR_APPS_SCRIPT_URL_HERE');
+  document.getElementById('cfg-read').value = isConfigured ? config.readUrl : '';
+  document.getElementById('cfg-write').value = (config.writeUrl && !config.writeUrl.includes('PASTE_YOUR_APPS_SCRIPT_URL_HERE')) ? config.writeUrl : '';
+  if(isConfigured){
     await fetchData();
   }else{
     setSync('idle');
