@@ -279,6 +279,7 @@
           <button class="primary" id="btn-save-config">Save & Connect</button>
           <button class="secondary" id="btn-test-config">Test Connection</button>
           <button class="secondary" id="btn-open-url">Open URL in new tab</button>
+          <button class="secondary" id="btn-reset-config">Reset to default URL</button>
         </div>
       </div>
     </section>
@@ -760,6 +761,21 @@ document.getElementById('form-edit').addEventListener('submit', async (e) => {
 document.getElementById('btn-refresh').addEventListener('click', fetchData);
 
 // ---------- settings ----------
+document.getElementById('btn-reset-config').addEventListener('click', async () => {
+  try{ localStorage.removeItem('po_tracker_config'); }catch(e){ /* ignore */ }
+  config.readUrl = DEFAULT_READ_URL;
+  config.writeUrl = DEFAULT_WRITE_URL;
+  document.getElementById('cfg-read').value = DEFAULT_READ_URL;
+  document.getElementById('cfg-write').value = DEFAULT_WRITE_URL;
+  showBanner('settings','warn','Cleared saved settings. Reconnecting with the default URL...');
+  await fetchData();
+  if(document.getElementById('syncstate').textContent.startsWith('Connected')){
+    showBanner('settings','info','Connected successfully using the default URL.');
+  }else{
+    showBanner('settings','error','Still could not connect. Error detail: "' + lastFetchError + '".');
+  }
+});
+
 document.getElementById('btn-open-url').addEventListener('click', () => {
   const url = document.getElementById('cfg-read').value.trim();
   if(!url){ alert('First type or paste the Read URL.'); return; }
@@ -807,6 +823,19 @@ document.querySelectorAll('.navbtn').forEach(btn => {
   document.getElementById('cfg-write').value = (config.writeUrl && !config.writeUrl.includes('PASTE_YOUR_APPS_SCRIPT_URL_HERE')) ? config.writeUrl : '';
   if(isConfigured){
     await fetchData();
+    // Self-heal: if a previously-saved URL in this browser no longer works,
+    // automatically fall back to the URL baked into this file.
+    if(lastFetchError && config.readUrl !== DEFAULT_READ_URL){
+      config.readUrl = DEFAULT_READ_URL;
+      config.writeUrl = DEFAULT_WRITE_URL;
+      await fetchData();
+    }
+    // Land on the Dashboard so the loaded data is visible immediately,
+    // with nothing to click.
+    document.querySelectorAll('.navbtn').forEach(b=>b.classList.remove('active'));
+    document.querySelector('[data-tab="dashboard"]').classList.add('active');
+    document.querySelectorAll('main > section').forEach(s => s.style.display = 'none');
+    document.getElementById('tab-dashboard').style.display = 'block';
   }else{
     setSync('idle');
     document.querySelectorAll('.navbtn').forEach(b=>b.classList.remove('active'));
