@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PO Tracker — GreenHill Products</title>
+<style>
+  :root{
+    --ghp-green:#76BC21;
+    --ghp-deep-green:#5A9A18;
+    --ghp-light-green:#A8D85A;
+    --ghp-mint:#EAFAD2;
+    --ghp-charcoal:#555555;
+    --ghp-dark-charcoal:#333333;
+    --ghp-mid-gray:#888886;
+    --ghp-light-gray:#DDDDDB;
+    --ghp-off-white:#F5F5F2;
+    --ghp-white:#FFFFFF;
+    --radius:6px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:Arial, Helvetica, sans-serif;
+    background:var(--ghp-off-white);
+    color:var(--ghp-dark-charcoal);
+    font-size:14px;
+  }
+  #app{display:flex; min-height:100vh;}
+
+  /* Sidebar */
+  nav{
+    width:200px;
+    background:var(--ghp-dark-charcoal);
+    color:var(--ghp-white);
+    flex-shrink:0;
+    display:flex;
+    flex-direction:column;
+    padding:20px 0;
+  }
+  .brand{
+    padding:0 20px 20px 20px;
+    border-bottom:1px solid #4a4a4a;
+    margin-bottom:16px;
+  }
+  .brand .name{font-weight:bold; font-size:15px; letter-spacing:.3px;}
+  .brand .sub{color:var(--ghp-light-green); font-size:11px; margin-top:2px;}
+  .navbtn{
+    background:none; border:none; color:var(--ghp-white);
+    text-align:left; padding:11px 20px; font-size:13.5px;
+    cursor:pointer; border-left:3px solid transparent;
+    display:flex; align-items:center; gap:8px;
+  }
+  .navbtn:hover{background:#454545;}
+  .navbtn.active{background:#454545; border-left-color:var(--ghp-green); color:var(--ghp-light-green); font-weight:bold;}
+  .navfoot{margin-top:auto; padding:14px 20px; font-size:11px; color:var(--ghp-mid-gray);}
+  #syncdot{display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:5px; background:var(--ghp-mid-gray);}
+  #syncdot.ok{background:var(--ghp-green);}
+  #syncdot.err{background:#C0392B;}
+
+  main{flex:1; padding:28px 34px; max-width:1400px;}
+  h1{margin:0 0 4px 0; font-size:21px; color:var(--ghp-dark-charcoal);}
+  .pagesub{color:var(--ghp-mid-gray); margin-bottom:22px; font-size:13px;}
+
+  .card{
+    background:var(--ghp-white);
+    border:1px solid var(--ghp-light-gray);
+    border-radius:var(--radius);
+    padding:22px;
+    margin-bottom:18px;
+  }
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+  .grid4{display:grid; grid-template-columns:repeat(4,1fr); gap:16px;}
+  label{display:block; font-size:12px; font-weight:bold; color:var(--ghp-charcoal); margin-bottom:5px;}
+  input[type=text], input[type=number], input[type=date], select, textarea{
+    width:100%; padding:8px 10px; border:1px solid var(--ghp-light-gray);
+    border-radius:4px; font-family:inherit; font-size:13.5px; color:var(--ghp-dark-charcoal);
+    background:var(--ghp-white);
+  }
+  input:disabled{background:var(--ghp-off-white); color:var(--ghp-mid-gray);}
+  textarea{resize:vertical; min-height:60px;}
+  .field{margin-bottom:14px;}
+  .hint{font-size:11px; color:var(--ghp-mid-gray); margin-top:4px;}
+
+  button.primary{
+    background:var(--ghp-green); color:var(--ghp-white); border:none;
+    padding:10px 20px; border-radius:4px; font-weight:bold; font-size:13.5px;
+    cursor:pointer;
+  }
+  button.primary:hover{background:var(--ghp-deep-green);}
+  button.secondary{
+    background:var(--ghp-white); color:var(--ghp-charcoal); border:1px solid var(--ghp-light-gray);
+    padding:9px 16px; border-radius:4px; font-size:13px; cursor:pointer;
+  }
+  button.secondary:hover{border-color:var(--ghp-mid-gray);}
+  button.link{background:none; border:none; color:var(--ghp-deep-green); font-size:12.5px; cursor:pointer; padding:0; font-weight:bold;}
+  button:disabled{opacity:.5; cursor:not-allowed;}
+
+  .toolbar{display:flex; gap:10px; align-items:center; margin-bottom:16px; flex-wrap:wrap;}
+  .toolbar select, .toolbar input{width:auto; min-width:150px;}
+
+  table{width:100%; border-collapse:collapse; font-size:12.8px;}
+  th{
+    background:var(--ghp-green); color:var(--ghp-white); text-align:left;
+    padding:9px 10px; font-size:11.5px; text-transform:uppercase; letter-spacing:.3px;
+    position:sticky; top:0;
+  }
+  td{padding:9px 10px; border-bottom:1px solid var(--ghp-light-gray);}
+  tbody tr:nth-child(even){background:var(--ghp-off-white);}
+  tbody tr:hover{background:var(--ghp-mint); cursor:pointer;}
+  tbody tr.overdue td:first-child{border-left:3px solid #C0392B;}
+  .tablewrap{overflow-x:auto; border:1px solid var(--ghp-light-gray); border-radius:var(--radius);}
+
+  .badge{
+    display:inline-block; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:bold;
+  }
+  .badge.PENDING{background:var(--ghp-light-gray); color:var(--ghp-dark-charcoal);}
+  .badge.DELIVERED{background:var(--ghp-mint); color:var(--ghp-deep-green);}
+  .badge.PARTIAL{background:#FCEFCB; color:#8A6D00;}
+  .badge.BACKORDER{background:#F8D7D3; color:#B0281A;}
+  .overduetag{color:#C0392B; font-weight:bold; font-size:11px;}
+
+  .modal-bg{
+    display:none; position:fixed; inset:0; background:rgba(0,0,0,.45);
+    align-items:flex-start; justify-content:center; z-index:100; padding:40px 20px; overflow-y:auto;
+  }
+  .modal-bg.show{display:flex;}
+  .modal{
+    background:var(--ghp-white); border-radius:var(--radius); padding:26px; width:100%; max-width:720px;
+  }
+  .modal h2{margin-top:0; font-size:17px;}
+  .modal-actions{display:flex; justify-content:flex-end; gap:10px; margin-top:20px; border-top:1px solid var(--ghp-light-gray); padding-top:16px;}
+
+  .banner{padding:10px 14px; border-radius:4px; font-size:13px; margin-bottom:16px;}
+  .banner.error{background:#F8D7D3; color:#8A1F14; border:1px solid #E9A79E;}
+  .banner.info{background:var(--ghp-mint); color:var(--ghp-deep-green); border:1px solid var(--ghp-light-green);}
+  .banner.warn{background:#FCEFCB; color:#7A5E00; border:1px solid #E9CE7A;}
+
+  .empty{text-align:center; padding:50px 20px; color:var(--ghp-mid-gray);}
+  .vendorrow{display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--ghp-light-gray);}
+  .vendorrow:last-child{border-bottom:none;}
+  .ponum{font-weight:bold; color:var(--ghp-deep-green);}
+  .section-title{font-size:13px; font-weight:bold; color:var(--ghp-charcoal); margin:18px 0 10px 0; text-transform:uppercase; letter-spacing:.3px;}
+  .invoicegrid{display:grid; grid-template-columns:1fr 1fr; gap:12px 16px;}
+</style>
+</head>
+<body>
+<div id="app">
+  <nav>
+    <div class="brand">
+      <div class="name">GreenHill Products</div>
+      <div class="sub">PO Tracker</div>
+    </div>
+    <button class="navbtn active" data-tab="nueva">＋ Nueva orden</button>
+    <button class="navbtn" data-tab="tablero">▤ Tablero</button>
+    <button class="navbtn" data-tab="vendors">⚑ Vendors</button>
+    <button class="navbtn" data-tab="config">⚙ Configuración</button>
+    <div class="navfoot"><span id="syncdot"></span><span id="syncstate">Sin conectar</span></div>
+  </nav>
+
+  <main>
+    <!-- NUEVA ORDEN -->
+    <section id="tab-nueva">
+      <h1>Nueva orden de compra</h1>
+      <div class="pagesub">Se guarda directo en la hoja de cálculo conectada.</div>
+      <div id="banner-nueva"></div>
+      <div class="card">
+        <form id="form-nueva">
+          <div class="grid2">
+            <div class="field"><label>Customer</label><input type="text" id="f-customer" required></div>
+            <div class="field"><label>Address</label><input type="text" id="f-address" required></div>
+          </div>
+          <div class="grid2">
+            <div class="field"><label>Lot / House</label><input type="text" id="f-lot" required></div>
+            <div class="field"><label>Phases</label><input type="text" id="f-phases" required></div>
+          </div>
+          <div class="grid2">
+            <div class="field">
+              <label>Vendor</label>
+              <select id="f-vendor" required></select>
+              <div class="hint"><button type="button" class="link" id="btn-open-newvendor">+ Agregar vendor nuevo</button></div>
+            </div>
+            <div class="field">
+              <label>PO Number (automático)</label>
+              <input type="text" id="f-ponumber" disabled>
+            </div>
+          </div>
+          <div class="grid2">
+            <div class="field"><label>PO Creation Date</label><input type="text" id="f-creationdate" disabled></div>
+            <div class="field"><label>Vendor Lead Time — ETA estimada</label><input type="text" id="f-leadtime" disabled></div>
+          </div>
+          <button type="submit" class="primary" id="btn-submit-po">Crear orden</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- TABLERO -->
+    <section id="tab-tablero" style="display:none;">
+      <h1>Tablero de órdenes</h1>
+      <div class="pagesub">Haz clic en una fila para actualizar confirmación, entrega, facturas y estado.</div>
+      <div id="banner-tablero"></div>
+      <div class="toolbar">
+        <input type="text" id="filter-search" placeholder="Buscar customer o PO number...">
+        <select id="filter-status">
+          <option value="">Todos los status</option>
+          <option value="PENDING">PENDING</option>
+          <option value="DELIVERED">DELIVERED</option>
+          <option value="PARTIAL">PARTIAL</option>
+          <option value="BACKORDER">BACKORDER</option>
+        </select>
+        <select id="filter-vendor"><option value="">Todos los vendors</option></select>
+        <label style="display:flex;align-items:center;gap:6px;font-weight:normal;font-size:12.5px;color:var(--ghp-charcoal);margin:0;">
+          <input type="checkbox" id="filter-overdue" style="width:auto;"> Solo atrasadas
+        </label>
+        <button class="secondary" id="btn-refresh">↻ Actualizar</button>
+      </div>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>PO Number</th><th>Customer</th><th>Vendor</th><th>Creación</th>
+              <th>ETA estimada</th><th>Status</th><th>Cost</th><th>Debt</th>
+            </tr>
+          </thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </div>
+      <div id="table-empty" class="empty" style="display:none;">No hay órdenes que coincidan con el filtro.</div>
+    </section>
+
+    <!-- VENDORS -->
+    <section id="tab-vendors" style="display:none;">
+      <h1>Vendors</h1>
+      <div class="pagesub">Lead time en días — se usa para calcular la ETA automática de cada orden.</div>
+      <div id="banner-vendors"></div>
+      <div class="card">
+        <div class="section-title">Agregar vendor</div>
+        <form id="form-vendor" class="grid2" style="align-items:end;">
+          <div class="field" style="margin-bottom:0;"><label>Nombre del vendor</label><input type="text" id="v-name" required></div>
+          <div class="field" style="margin-bottom:0;"><label>Lead time (días)</label><input type="number" id="v-leadtime" min="0" required></div>
+          <div style="grid-column:1/-1; margin-top:14px;"><button type="submit" class="primary">Agregar vendor</button></div>
+        </form>
+      </div>
+      <div class="card">
+        <div class="section-title">Vendors actuales</div>
+        <div id="vendor-list"></div>
+      </div>
+    </section>
+
+    <!-- CONFIG -->
+    <section id="tab-config" style="display:none;">
+      <h1>Configuración</h1>
+      <div class="pagesub">Pega aquí la URL de tu Google Apps Script (Implementación web).</div>
+      <div id="banner-config"></div>
+      <div class="card">
+        <div class="field">
+          <label>Read URL</label>
+          <input type="text" id="cfg-read" placeholder="https://script.google.com/macros/s/XXXXXXXX/exec">
+        </div>
+        <div class="field">
+          <label>Write URL</label>
+          <input type="text" id="cfg-write" placeholder="https://script.google.com/macros/s/XXXXXXXX/exec">
+          <div class="hint">Con Google Sheets, normalmente es la misma URL en ambos campos.</div>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <button class="primary" id="btn-save-config">Guardar y conectar</button>
+          <button class="secondary" id="btn-test-config">Probar conexión</button>
+          <button class="secondary" id="btn-open-url">Abrir URL en pestaña nueva</button>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- MODAL EDITAR PO -->
+<div class="modal-bg" id="modal-bg">
+  <div class="modal">
+    <h2>Actualizar orden <span id="modal-ponum" class="ponum"></span></h2>
+    <form id="form-edit">
+      <div class="grid2">
+        <div class="field"><label>PO Confirmation ETA</label><input type="date" id="e-confeta"></div>
+        <div class="field">
+          <label>Status</label>
+          <select id="e-status">
+            <option value="PENDING">PENDING</option>
+            <option value="DELIVERED">DELIVERED</option>
+            <option value="PARTIAL">PARTIAL</option>
+            <option value="BACKORDER">BACKORDER</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Actual Delivery Time</label><input type="date" id="e-actualdelivery"></div>
+        <div class="field"><label>Real Delivery Time</label><input type="date" id="e-realdelivery"></div>
+      </div>
+      <div class="field"><label>Status PO</label><input type="text" id="e-statuspo"></div>
+      <div class="grid2">
+        <div class="field"><label>Description</label><input type="text" id="e-description"></div>
+        <div class="field"><label>Cost of PO</label><input type="number" step="0.01" id="e-cost"></div>
+      </div>
+      <div class="field"><label>Notes</label><textarea id="e-notes"></textarea></div>
+
+      <div class="section-title">Facturas</div>
+      <div class="invoicegrid">
+        <div class="field"><label>Description 2</label><input type="text" id="e-desc2"></div>
+        <div class="field"><label>Invoice 1</label><input type="text" id="e-inv1"></div>
+        <div class="field"><label>Description 3</label><input type="text" id="e-desc3"></div>
+        <div class="field"><label>Invoice 2</label><input type="text" id="e-inv2"></div>
+        <div class="field"><label>Description 4</label><input type="text" id="e-desc4"></div>
+        <div class="field"><label>Invoice 3</label><input type="text" id="e-inv3"></div>
+        <div class="field"><label>Description 5</label><input type="text" id="e-desc5"></div>
+        <div class="field"><label>Invoice 4</label><input type="text" id="e-inv4"></div>
+      </div>
+      <div class="grid2" style="margin-top:14px;">
+        <div class="field"><label>Description 6</label><input type="text" id="e-desc6"></div>
+        <div class="field"><label>Debt</label><input type="number" step="0.01" id="e-debt"></div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="secondary" id="btn-cancel-edit">Cancelar</button>
+        <button type="submit" class="primary">Guardar cambios</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL NUEVO VENDOR (desde formulario de orden) -->
+<div class="modal-bg" id="modal-vendor-bg">
+  <div class="modal" style="max-width:420px;">
+    <h2>Agregar vendor nuevo</h2>
+    <form id="form-quick-vendor">
+      <div class="field"><label>Nombre del vendor</label><input type="text" id="qv-name" required></div>
+      <div class="field"><label>Lead time (días)</label><input type="number" min="0" id="qv-leadtime" required></div>
+      <div class="modal-actions">
+        <button type="button" class="secondary" id="btn-cancel-vendor">Cancelar</button>
+        <button type="submit" class="primary">Agregar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+let config = { readUrl:'', writeUrl:'' };
+let pos = [];
+let vendors = [];
+let editingPoNumber = null;
+
+// ---------- storage ----------
+async function loadConfig(){
+  try{
+    const res = await window.storage.get('po_tracker_config', false);
+    if(res && res.value){ config = JSON.parse(res.value); }
+  }catch(e){ /* no config saved yet */ }
+}
+async function persistConfig(){
+  await window.storage.set('po_tracker_config', JSON.stringify(config), false);
+}
+
+// ---------- sync status ----------
+function setSync(state, msg){
+  const dot = document.getElementById('syncdot');
+  const label = document.getElementById('syncstate');
+  dot.className = state === 'ok' ? 'ok' : (state === 'err' ? 'err' : '');
+  const now = new Date().toLocaleTimeString('es-CO', {hour:'2-digit', minute:'2-digit'});
+  if(state==='ok') label.textContent = 'Conectado · ' + now;
+  else if(state==='err') label.textContent = 'Error de conexión';
+  else if(state==='loading') label.textContent = 'Sincronizando...';
+  else label.textContent = msg || 'Sin conectar';
+}
+function showBanner(tabId, type, text){
+  const el = document.getElementById('banner-' + tabId);
+  if(!el) return;
+  if(!text){ el.innerHTML=''; return; }
+  el.innerHTML = '<div class="banner ' + type + '">' + text + '</div>';
+}
+
+// ---------- data fetch ----------
+let lastFetchError = '';
+
+async function fetchData(){
+  if(!config.readUrl){ setSync('idle'); return; }
+  setSync('loading');
+  try{
+    const res = await fetch(config.readUrl, { method:'GET' });
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    pos = data.pos || [];
+    vendors = data.vendors || [];
+    lastFetchError = '';
+    setSync('ok');
+    renderAll();
+  }catch(e){
+    let detail = e.message || String(e);
+    // Diagnóstico extra: probamos sin CORS solo para saber si el bloqueo es de política CORS
+    // (el servidor sí responde) o algo más de fondo (la conexión ni siquiera llega).
+    try{
+      await fetch(config.readUrl, { method:'GET', mode:'no-cors' });
+      detail += ' | Diagnóstico: el servidor SÍ responde — es un bloqueo de política CORS del lado de Google, no de red.';
+    }catch(e2){
+      detail += ' | Diagnóstico: la conexión no llega ni siquiera sin CORS — puede ser un bloqueo de red, no de CORS.';
+    }
+    lastFetchError = detail;
+    setSync('err');
+    showBanner('tablero', 'error', 'No se pudo leer la hoja. Revisa la Read URL en Configuración. (' + detail + ')');
+  }
+}
+
+async function writeData(payload){
+  if(!config.writeUrl){ throw new Error('Falta configurar la Write URL.'); }
+  const res = await fetch(config.writeUrl, {
+    method:'POST',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body: JSON.stringify(payload)
+  });
+  if(!res.ok) throw new Error('HTTP ' + res.status);
+  try{ return await res.json(); }catch(e){ return {}; }
+}
+
+// ---------- helpers ----------
+function todayISO(){
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function fmtDate(iso){
+  if(!iso) return '—';
+  const d = new Date(iso + (iso.length<=10 ? 'T00:00:00' : ''));
+  if(isNaN(d)) return iso;
+  return d.toLocaleDateString('es-CO', {day:'2-digit', month:'2-digit', year:'numeric'});
+}
+function nextPoNumber(){
+  const d = new Date();
+  const prefix = String(d.getFullYear()).slice(-2) + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
+  let maxSeq = 1000;
+  pos.forEach(p=>{
+    const num = String(p.PO_NUMBER || '');
+    const parts = num.split('-');
+    if(parts.length === 2){
+      const seq = parseInt(parts[1], 10);
+      if(!isNaN(seq) && seq > maxSeq) maxSeq = seq;
+    }
+  });
+  return prefix + '-' + (maxSeq + 1);
+}
+function calcLeadTimeDate(vendorName){
+  const v = vendors.find(v => v.VENDOR_NAME === vendorName);
+  if(!v) return '';
+  const days = parseInt(v.LEAD_TIME_DAYS, 10) || 0;
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function isOverdue(po){
+  if(!po.VENDOR_LEAD_TIME) return false;
+  if(po.STATUS === 'DELIVERED') return false;
+  const eta = new Date(po.VENDOR_LEAD_TIME + 'T00:00:00');
+  const today = new Date(); today.setHours(0,0,0,0);
+  return eta < today;
+}
+function esc(s){
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ---------- render ----------
+function renderAll(){
+  renderVendorSelect();
+  renderVendorFilterSelect();
+  renderVendorList();
+  renderTable();
+  resetNewPoDefaults();
+}
+
+function renderVendorSelect(){
+  const sel = document.getElementById('f-vendor');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Selecciona un vendor...</option>' +
+    vendors.map(v => '<option value="' + esc(v.VENDOR_NAME) + '">' + esc(v.VENDOR_NAME) + ' (' + esc(v.LEAD_TIME_DAYS) + ' días)</option>').join('');
+  if(current) sel.value = current;
+}
+function renderVendorFilterSelect(){
+  const sel = document.getElementById('filter-vendor');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Todos los vendors</option>' +
+    vendors.map(v => '<option value="' + esc(v.VENDOR_NAME) + '">' + esc(v.VENDOR_NAME) + '</option>').join('');
+  sel.value = current;
+}
+function renderVendorList(){
+  const el = document.getElementById('vendor-list');
+  if(vendors.length === 0){ el.innerHTML = '<div class="empty">Aún no hay vendors. Agrega el primero arriba.</div>'; return; }
+  el.innerHTML = vendors.map(v =>
+    '<div class="vendorrow"><div><strong>' + esc(v.VENDOR_NAME) + '</strong></div><div>' + esc(v.LEAD_TIME_DAYS) + ' días de lead time</div></div>'
+  ).join('');
+}
+
+function renderTable(){
+  const search = document.getElementById('filter-search').value.trim().toLowerCase();
+  const statusF = document.getElementById('filter-status').value;
+  const vendorF = document.getElementById('filter-vendor').value;
+  const overdueOnly = document.getElementById('filter-overdue').checked;
+
+  let rows = pos.filter(p => {
+    if(statusF && p.STATUS !== statusF) return false;
+    if(vendorF && p.VENDOR !== vendorF) return false;
+    if(overdueOnly && !isOverdue(p)) return false;
+    if(search){
+      const hay = (String(p.CUSTOMER||'') + ' ' + String(p.PO_NUMBER||'')).toLowerCase();
+      if(!hay.includes(search)) return false;
+    }
+    return true;
+  });
+  rows.sort((a,b) => String(b.PO_NUMBER||'').localeCompare(String(a.PO_NUMBER||'')));
+
+  const tbody = document.getElementById('table-body');
+  const emptyEl = document.getElementById('table-empty');
+  if(rows.length === 0){
+    tbody.innerHTML = '';
+    emptyEl.style.display = 'block';
+    return;
+  }
+  emptyEl.style.display = 'none';
+
+  tbody.innerHTML = rows.map(p => {
+    const overdue = isOverdue(p);
+    const status = p.STATUS || 'PENDING';
+    return '<tr class="' + (overdue ? 'overdue' : '') + '" data-po="' + esc(p.PO_NUMBER) + '">' +
+      '<td class="ponum">' + esc(p.PO_NUMBER) + '</td>' +
+      '<td>' + esc(p.CUSTOMER) + '</td>' +
+      '<td>' + esc(p.VENDOR) + '</td>' +
+      '<td>' + fmtDate(p.PO_CREATION_DATE) + '</td>' +
+      '<td>' + fmtDate(p.VENDOR_LEAD_TIME) + (overdue ? '<div class="overduetag">ATRASADA</div>' : '') + '</td>' +
+      '<td><span class="badge ' + esc(status) + '">' + esc(status) + '</span></td>' +
+      '<td>' + (p.COST_OF_PO ? esc(p.COST_OF_PO) : '—') + '</td>' +
+      '<td>' + (p.DEBT ? esc(p.DEBT) : '—') + '</td>' +
+      '</tr>';
+  }).join('');
+
+  Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
+    tr.addEventListener('click', () => openEditModal(tr.getAttribute('data-po')));
+  });
+}
+
+function resetNewPoDefaults(){
+  document.getElementById('f-ponumber').value = nextPoNumber();
+  document.getElementById('f-creationdate').value = fmtDate(todayISO());
+  updateLeadTimePreview();
+}
+function updateLeadTimePreview(){
+  const vendorName = document.getElementById('f-vendor').value;
+  const iso = vendorName ? calcLeadTimeDate(vendorName) : '';
+  document.getElementById('f-leadtime').value = iso ? fmtDate(iso) : '';
+}
+
+// ---------- new PO ----------
+document.getElementById('f-vendor').addEventListener('change', updateLeadTimePreview);
+
+document.getElementById('form-nueva').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const vendorName = document.getElementById('f-vendor').value;
+  if(!vendorName){ showBanner('nueva','error','Selecciona un vendor.'); return; }
+  const btn = document.getElementById('btn-submit-po');
+  btn.disabled = true;
+  const po = {
+    CUSTOMER: document.getElementById('f-customer').value,
+    ADDRESS: document.getElementById('f-address').value,
+    LOT_HOUSE: document.getElementById('f-lot').value,
+    PHASES: document.getElementById('f-phases').value,
+    VENDOR: vendorName,
+    PO_NUMBER: document.getElementById('f-ponumber').value,
+    PO_CREATION_DATE: todayISO(),
+    VENDOR_LEAD_TIME: calcLeadTimeDate(vendorName),
+    STATUS: 'PENDING'
+  };
+  try{
+    await writeData({ action:'addPo', po });
+    showBanner('nueva','info','Orden ' + po.PO_NUMBER + ' creada correctamente.');
+    document.getElementById('form-nueva').reset();
+    await fetchData();
+  }catch(err){
+    showBanner('nueva','error','No se pudo crear la orden: ' + err.message);
+  }finally{
+    btn.disabled = false;
+  }
+});
+
+// ---------- quick add vendor from PO form ----------
+document.getElementById('btn-open-newvendor').addEventListener('click', () => {
+  document.getElementById('modal-vendor-bg').classList.add('show');
+});
+document.getElementById('btn-cancel-vendor').addEventListener('click', () => {
+  document.getElementById('modal-vendor-bg').classList.remove('show');
+});
+document.getElementById('form-quick-vendor').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = document.getElementById('qv-name').value.trim();
+  const leadtime = document.getElementById('qv-leadtime').value;
+  try{
+    await writeData({ action:'addVendor', vendor:{ VENDOR_NAME:name, LEAD_TIME_DAYS:leadtime } });
+    document.getElementById('modal-vendor-bg').classList.remove('show');
+    document.getElementById('form-quick-vendor').reset();
+    await fetchData();
+    document.getElementById('f-vendor').value = name;
+    updateLeadTimePreview();
+  }catch(err){
+    alert('No se pudo agregar el vendor: ' + err.message);
+  }
+});
+
+// ---------- vendors tab ----------
+document.getElementById('form-vendor').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = document.getElementById('v-name').value.trim();
+  const leadtime = document.getElementById('v-leadtime').value;
+  try{
+    await writeData({ action:'addVendor', vendor:{ VENDOR_NAME:name, LEAD_TIME_DAYS:leadtime } });
+    showBanner('vendors','info','Vendor agregado.');
+    document.getElementById('form-vendor').reset();
+    await fetchData();
+  }catch(err){
+    showBanner('vendors','error','No se pudo agregar el vendor: ' + err.message);
+  }
+});
+
+// ---------- edit PO modal ----------
+function openEditModal(poNumber){
+  const po = pos.find(p => String(p.PO_NUMBER) === String(poNumber));
+  if(!po) return;
+  editingPoNumber = poNumber;
+  document.getElementById('modal-ponum').textContent = poNumber;
+  document.getElementById('e-confeta').value = po.PO_CONFIRMATION_ETA || '';
+  document.getElementById('e-status').value = po.STATUS || 'PENDING';
+  document.getElementById('e-actualdelivery').value = po.ACTUAL_DELIVERY_TIME || '';
+  document.getElementById('e-realdelivery').value = po.REAL_DELIVERY_TIME || '';
+  document.getElementById('e-statuspo').value = po.STATUS_PO || '';
+  document.getElementById('e-description').value = po.DESCRIPTION || '';
+  document.getElementById('e-cost').value = po.COST_OF_PO || '';
+  document.getElementById('e-notes').value = po.NOTES || '';
+  document.getElementById('e-desc2').value = po.DESCRIPTION_2 || '';
+  document.getElementById('e-inv1').value = po.INVOICE_1 || '';
+  document.getElementById('e-desc3').value = po.DESCRIPTION_3 || '';
+  document.getElementById('e-inv2').value = po.INVOICE_2 || '';
+  document.getElementById('e-desc4').value = po.DESCRIPTION_4 || '';
+  document.getElementById('e-inv3').value = po.INVOICE_3 || '';
+  document.getElementById('e-desc5').value = po.DESCRIPTION_5 || '';
+  document.getElementById('e-inv4').value = po.INVOICE_4 || '';
+  document.getElementById('e-desc6').value = po.DESCRIPTION_6 || '';
+  document.getElementById('e-debt').value = po.DEBT || '';
+  document.getElementById('modal-bg').classList.add('show');
+}
+document.getElementById('btn-cancel-edit').addEventListener('click', () => {
+  document.getElementById('modal-bg').classList.remove('show');
+});
+document.getElementById('form-edit').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const po = {
+    PO_NUMBER: editingPoNumber,
+    PO_CONFIRMATION_ETA: document.getElementById('e-confeta').value,
+    STATUS: document.getElementById('e-status').value,
+    ACTUAL_DELIVERY_TIME: document.getElementById('e-actualdelivery').value,
+    REAL_DELIVERY_TIME: document.getElementById('e-realdelivery').value,
+    STATUS_PO: document.getElementById('e-statuspo').value,
+    DESCRIPTION: document.getElementById('e-description').value,
+    COST_OF_PO: document.getElementById('e-cost').value,
+    NOTES: document.getElementById('e-notes').value,
+    DESCRIPTION_2: document.getElementById('e-desc2').value,
+    INVOICE_1: document.getElementById('e-inv1').value,
+    DESCRIPTION_3: document.getElementById('e-desc3').value,
+    INVOICE_2: document.getElementById('e-inv2').value,
+    DESCRIPTION_4: document.getElementById('e-desc4').value,
+    INVOICE_3: document.getElementById('e-inv3').value,
+    DESCRIPTION_5: document.getElementById('e-desc5').value,
+    INVOICE_4: document.getElementById('e-inv4').value,
+    DESCRIPTION_6: document.getElementById('e-desc6').value,
+    DEBT: document.getElementById('e-debt').value
+  };
+  try{
+    await writeData({ action:'updatePo', po });
+    document.getElementById('modal-bg').classList.remove('show');
+    await fetchData();
+  }catch(err){
+    alert('No se pudo guardar: ' + err.message);
+  }
+});
+
+// ---------- filters ----------
+['filter-search','filter-status','filter-vendor','filter-overdue'].forEach(id => {
+  document.getElementById(id).addEventListener('input', renderTable);
+  document.getElementById(id).addEventListener('change', renderTable);
+});
+document.getElementById('btn-refresh').addEventListener('click', fetchData);
+
+// ---------- config ----------
+document.getElementById('btn-save-config').addEventListener('click', async () => {
+  config.readUrl = document.getElementById('cfg-read').value.trim();
+  config.writeUrl = document.getElementById('cfg-write').value.trim();
+  await persistConfig();
+  showBanner('config','info','Configuración guardada. Conectando...');
+  await fetchData();
+  if(document.getElementById('syncstate').textContent.startsWith('Conectado')){
+    showBanner('config','info','Conectado correctamente.');
+  }else{
+    showBanner('config','error','Guardado, pero no se pudo conectar. Detalle del error: "' + lastFetchError + '".');
+  }
+});
+document.getElementById('btn-open-url').addEventListener('click', () => {
+  const url = document.getElementById('cfg-read').value.trim();
+  if(!url){ alert('Primero escribe o pega la Read URL.'); return; }
+  window.open(url, '_blank');
+});
+
+document.getElementById('btn-test-config').addEventListener('click', async () => {
+  showBanner('config','warn','Probando conexión...');
+  await fetchData();
+  if(document.getElementById('syncstate').textContent.startsWith('Conectado')){
+    showBanner('config','info','Conexión exitosa. Se leyeron ' + pos.length + ' órdenes y ' + vendors.length + ' vendors.');
+  }else{
+    showBanner('config','error','No se pudo conectar. Detalle del error: "' + lastFetchError + '". Revisa la URL y que el acceso esté en "Cualquier usuario".');
+  }
+});
+
+// ---------- nav ----------
+document.querySelectorAll('.navbtn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.navbtn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('main > section').forEach(s => s.style.display = 'none');
+    document.getElementById('tab-' + btn.dataset.tab).style.display = 'block';
+  });
+});
+
+// ---------- init ----------
+(async function init(){
+  await loadConfig();
+  document.getElementById('cfg-read').value = config.readUrl || '';
+  document.getElementById('cfg-write').value = config.writeUrl || '';
+  if(config.readUrl){
+    await fetchData();
+  }else{
+    setSync('idle', 'Configura tus URLs en Configuración');
+    document.querySelectorAll('.navbtn').forEach(b=>b.classList.remove('active'));
+    document.querySelector('[data-tab="config"]').classList.add('active');
+    document.querySelectorAll('main > section').forEach(s => s.style.display = 'none');
+    document.getElementById('tab-config').style.display = 'block';
+    showBanner('config','warn','Aún no has conectado tu hoja. Pega la URL de tu Google Apps Script y guarda.');
+  }
+  setInterval(fetchData, 180000); // auto-refresh cada 3 min
+})();
+</script>
+</body>
+</html>
