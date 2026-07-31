@@ -153,6 +153,16 @@
   .ponum{font-weight:bold; color:var(--ghp-deep-green);}
   .section-title{font-size:13px; font-weight:bold; color:var(--ghp-charcoal); margin:18px 0 10px 0; text-transform:uppercase; letter-spacing:.3px;}
   .invoicegrid{display:grid; grid-template-columns:1fr 1fr; gap:12px 16px;}
+
+  .kpi-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:14px; margin-bottom:18px;}
+  .kpi-card{background:var(--ghp-white); border:1px solid var(--ghp-light-gray); border-radius:var(--radius); padding:16px;}
+  .kpi-card .value{font-size:24px; font-weight:bold; color:var(--ghp-deep-green); line-height:1.2;}
+  .kpi-card .label{font-size:11px; color:var(--ghp-mid-gray); text-transform:uppercase; letter-spacing:.3px; margin-top:4px;}
+  .bar-row{display:flex; align-items:center; gap:10px; margin-bottom:10px;}
+  .bar-label{width:110px; font-size:12px; flex-shrink:0;}
+  .bar-track{flex:1; background:var(--ghp-off-white); border-radius:4px; height:14px; overflow:hidden;}
+  .bar-fill{height:100%; border-radius:4px;}
+  .bar-value{width:70px; text-align:right; font-size:12px; font-weight:bold; flex-shrink:0;}
 </style>
 </head>
 <body>
@@ -164,6 +174,7 @@
     </div>
     <button class="navbtn active" data-tab="new">+ New PO</button>
     <button class="navbtn" data-tab="dashboard">▤ Dashboard</button>
+    <button class="navbtn" data-tab="stats">📊 Statistics</button>
     <button class="navbtn" data-tab="vendors">⚑ Vendors</button>
     <button class="navbtn" data-tab="settings">⚙ Settings</button>
     <div class="navfoot"><span id="syncdot"></span><span id="syncstate">Not connected</span></div>
@@ -239,6 +250,46 @@
         </table>
       </div>
       <div id="table-empty" class="empty" style="display:none;">No orders match this filter.</div>
+    </section>
+
+    <!-- STATISTICS -->
+    <section id="tab-stats" style="display:none;">
+      <h1>Statistics</h1>
+      <div class="pagesub">Filter by date range and vendor to see PO performance metrics.</div>
+      <div class="toolbar">
+        <label style="display:flex;align-items:center;gap:6px;font-weight:normal;font-size:12.5px;color:var(--ghp-charcoal);margin:0;">
+          From <input type="date" id="stats-from" style="width:auto;">
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-weight:normal;font-size:12.5px;color:var(--ghp-charcoal);margin:0;">
+          To <input type="date" id="stats-to" style="width:auto;">
+        </label>
+        <select id="stats-vendor"><option value="">All vendors</option></select>
+        <button class="secondary" id="btn-stats-clear">Clear filters</button>
+      </div>
+
+      <div class="kpi-grid" id="stats-kpis"></div>
+
+      <div class="card">
+        <div class="section-title">Status PO Breakdown</div>
+        <div id="stats-status-bars"></div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">POs Created by Month</div>
+        <div id="stats-month-bars"></div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">Vendor Performance</div>
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr><th>Vendor</th><th>POs</th><th>Avg. Days to Delivery</th><th>On-Time Rate</th><th>Total Cost</th></tr>
+            </thead>
+            <tbody id="stats-vendor-body"></tbody>
+          </table>
+        </div>
+      </div>
     </section>
 
     <!-- VENDORS -->
@@ -519,12 +570,31 @@ function esc(s){
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+// ---------- date helpers ----------
+function parseISO(d){
+  if(!d) return null;
+  const dt = new Date(String(d) + 'T00:00:00');
+  return isNaN(dt) ? null : dt;
+}
+function daysBetween(fromIso, toIso){
+  const A = parseISO(fromIso), B = parseISO(toIso);
+  if(!A || !B) return null;
+  return Math.round((B - A) / 86400000);
+}
+function monthKey(iso){
+  const d = parseISO(iso);
+  if(!d) return null;
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+
 // ---------- render ----------
 function renderAll(){
   renderVendorSelect();
-  renderVendorFilterSelect();
+  renderVendorFilterSelect('filter-vendor', 'All vendors');
+  renderVendorFilterSelect('stats-vendor', 'All vendors');
   renderVendorList();
   renderTable();
+  renderStats();
   resetNewPoDefaults();
 }
 
@@ -535,10 +605,10 @@ function renderVendorSelect(){
     vendors.map(v => '<option value="' + esc(v.VENDOR_NAME) + '">' + esc(v.VENDOR_NAME) + ' (' + esc(v.LEAD_TIME_DAYS) + ' days)</option>').join('');
   if(current) sel.value = current;
 }
-function renderVendorFilterSelect(){
-  const sel = document.getElementById('filter-vendor');
+function renderVendorFilterSelect(selectId, allLabel){
+  const sel = document.getElementById(selectId);
   const current = sel.value;
-  sel.innerHTML = '<option value="">All vendors</option>' +
+  sel.innerHTML = '<option value="">' + allLabel + '</option>' +
     vendors.map(v => '<option value="' + esc(v.VENDOR_NAME) + '">' + esc(v.VENDOR_NAME) + '</option>').join('');
   sel.value = current;
 }
@@ -548,6 +618,116 @@ function renderVendorList(){
   el.innerHTML = vendors.map(v =>
     '<div class="vendorrow"><div><strong>' + esc(v.VENDOR_NAME) + '</strong></div><div>' + esc(v.LEAD_TIME_DAYS) + ' days lead time</div></div>'
   ).join('');
+}
+
+// ---------- statistics ----------
+function kpiCard(label, value){
+  return '<div class="kpi-card"><div class="value">' + esc(value) + '</div><div class="label">' + esc(label) + '</div></div>';
+}
+function statsFilteredPos(){
+  const from = document.getElementById('stats-from').value;
+  const to = document.getElementById('stats-to').value;
+  const vendorF = document.getElementById('stats-vendor').value;
+  return pos.filter(p => {
+    if(vendorF && p.VENDOR !== vendorF) return false;
+    if((from || to) && !p.PO_CREATION_DATE) return false;
+    if(from && p.PO_CREATION_DATE < from) return false;
+    if(to && p.PO_CREATION_DATE > to) return false;
+    return true;
+  });
+}
+function avgOf(arr){
+  return arr.length ? (arr.reduce((a,b)=>a+b,0) / arr.length) : null;
+}
+function money(n){
+  return n ? ('$' + n.toLocaleString('en-US', {maximumFractionDigits:2})) : '—';
+}
+function renderStats(){
+  const filtered = statsFilteredPos();
+  const total = filtered.length;
+
+  const byStatus = { PENDING:0, DELIVERED:0, PARTIAL:0, BACKORDER:0 };
+  filtered.forEach(p => {
+    const s = String(p.STATUS_PO || 'PENDING').toUpperCase();
+    if(byStatus[s] !== undefined) byStatus[s]++;
+  });
+  const overdueNow = filtered.filter(p => computeStatusLight(p).level === 'red').length;
+
+  const leadDays = [];       // order date -> real delivery
+  const delayVsEta = [];     // vendor lead time (promised) -> real delivery
+  let onTimeCount = 0;
+  filtered.forEach(p => {
+    const ld = daysBetween(p.PO_CREATION_DATE, p.REAL_DELIVERY_TIME);
+    if(ld !== null) leadDays.push(ld);
+    const dv = daysBetween(p.VENDOR_LEAD_TIME, p.REAL_DELIVERY_TIME);
+    if(dv !== null){ delayVsEta.push(dv); if(dv <= 0) onTimeCount++; }
+  });
+  const avgLead = avgOf(leadDays);
+  const avgDelay = avgOf(delayVsEta);
+  const onTimeRate = delayVsEta.length ? Math.round(onTimeCount / delayVsEta.length * 100) : null;
+
+  const totalCost = filtered.reduce((sum,p) => sum + (parseFloat(p.COST_OF_PO) || 0), 0);
+  const totalDebt = filtered.reduce((sum,p) => sum + (parseFloat(p.DEBT) || 0), 0);
+
+  document.getElementById('stats-kpis').innerHTML = [
+    kpiCard('Total POs', total),
+    kpiCard('Pending', byStatus.PENDING),
+    kpiCard('Delivered', byStatus.DELIVERED),
+    kpiCard('Overdue Now', overdueNow),
+    kpiCard('Avg. Days to Delivery', avgLead !== null ? avgLead.toFixed(1) + 'd' : '—'),
+    kpiCard('Avg. Delay vs ETA', avgDelay !== null ? (avgDelay > 0 ? '+' : '') + avgDelay.toFixed(1) + 'd' : '—'),
+    kpiCard('On-Time Rate', onTimeRate !== null ? onTimeRate + '%' : '—'),
+    kpiCard('Total Cost of PO', money(totalCost)),
+    kpiCard('Total Debt', money(totalDebt))
+  ].join('');
+
+  const statusColors = { PENDING:'var(--ghp-light-gray)', DELIVERED:'var(--ghp-green)', PARTIAL:'var(--ghp-yellow)', BACKORDER:'var(--ghp-red)' };
+  document.getElementById('stats-status-bars').innerHTML = Object.keys(byStatus).map(s => {
+    const pct = total ? Math.round(byStatus[s] / total * 100) : 0;
+    return '<div class="bar-row"><div class="bar-label">' + s + '</div>' +
+      '<div class="bar-track"><div class="bar-fill" style="width:' + pct + '%;background:' + statusColors[s] + ';"></div></div>' +
+      '<div class="bar-value">' + byStatus[s] + ' (' + pct + '%)</div></div>';
+  }).join('');
+
+  const monthCounts = {};
+  filtered.forEach(p => {
+    const mk = monthKey(p.PO_CREATION_DATE);
+    if(mk) monthCounts[mk] = (monthCounts[mk] || 0) + 1;
+  });
+  const months = Object.keys(monthCounts).sort();
+  const maxCount = months.length ? Math.max(...months.map(m => monthCounts[m])) : 1;
+  document.getElementById('stats-month-bars').innerHTML = months.length ?
+    months.map(m => {
+      const pct = Math.round(monthCounts[m] / maxCount * 100);
+      return '<div class="bar-row"><div class="bar-label">' + m + '</div>' +
+        '<div class="bar-track"><div class="bar-fill" style="width:' + pct + '%;background:var(--ghp-green);"></div></div>' +
+        '<div class="bar-value">' + monthCounts[m] + '</div></div>';
+    }).join('') :
+    '<div class="empty">No data for this filter.</div>';
+
+  const vendorStats = {};
+  filtered.forEach(p => {
+    const v = p.VENDOR || '(no vendor)';
+    if(!vendorStats[v]) vendorStats[v] = { count:0, leadDays:[], onTime:0, withEta:0, cost:0 };
+    vendorStats[v].count++;
+    vendorStats[v].cost += parseFloat(p.COST_OF_PO) || 0;
+    const ld = daysBetween(p.PO_CREATION_DATE, p.REAL_DELIVERY_TIME);
+    if(ld !== null) vendorStats[v].leadDays.push(ld);
+    const dv = daysBetween(p.VENDOR_LEAD_TIME, p.REAL_DELIVERY_TIME);
+    if(dv !== null){ vendorStats[v].withEta++; if(dv <= 0) vendorStats[v].onTime++; }
+  });
+  const vendorNames = Object.keys(vendorStats).sort((a,b) => vendorStats[b].count - vendorStats[a].count);
+  document.getElementById('stats-vendor-body').innerHTML = vendorNames.length ?
+    vendorNames.map(v => {
+      const vs = vendorStats[v];
+      const avgLd = avgOf(vs.leadDays);
+      const onTimePct = vs.withEta ? Math.round(vs.onTime / vs.withEta * 100) : null;
+      return '<tr><td>' + esc(v) + '</td><td>' + vs.count + '</td>' +
+        '<td>' + (avgLd !== null ? avgLd.toFixed(1) + 'd' : '—') + '</td>' +
+        '<td>' + (onTimePct !== null ? onTimePct + '%' : '—') + '</td>' +
+        '<td>' + money(vs.cost) + '</td></tr>';
+    }).join('') :
+    '<tr><td colspan="5" style="text-align:center;color:var(--ghp-mid-gray);">No data for this filter.</td></tr>';
 }
 
 function renderTable(){
@@ -760,6 +940,17 @@ document.getElementById('form-edit').addEventListener('submit', async (e) => {
 });
 document.getElementById('btn-refresh').addEventListener('click', fetchData);
 
+['stats-from','stats-to','stats-vendor'].forEach(id => {
+  document.getElementById(id).addEventListener('input', renderStats);
+  document.getElementById(id).addEventListener('change', renderStats);
+});
+document.getElementById('btn-stats-clear').addEventListener('click', () => {
+  document.getElementById('stats-from').value = '';
+  document.getElementById('stats-to').value = '';
+  document.getElementById('stats-vendor').value = '';
+  renderStats();
+});
+
 // ---------- settings ----------
 document.getElementById('btn-reset-config').addEventListener('click', async () => {
   try{ localStorage.removeItem('po_tracker_config'); }catch(e){ /* ignore */ }
@@ -817,6 +1008,12 @@ document.querySelectorAll('.navbtn').forEach(btn => {
 
 // ---------- init ----------
 (async function init(){
+  // Default the Statistics tab to the last 30 days
+  const fromDefault = new Date();
+  fromDefault.setDate(fromDefault.getDate() - 30);
+  document.getElementById('stats-to').value = todayISO();
+  document.getElementById('stats-from').value = fromDefault.getFullYear() + '-' + String(fromDefault.getMonth()+1).padStart(2,'0') + '-' + String(fromDefault.getDate()).padStart(2,'0');
+
   await loadConfig();
   const isConfigured = config.readUrl && !config.readUrl.includes('PASTE_YOUR_APPS_SCRIPT_URL_HERE');
   document.getElementById('cfg-read').value = isConfigured ? config.readUrl : '';
