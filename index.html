@@ -110,6 +110,7 @@
   .badge.DELIVERED{background:var(--mint); color:var(--deep-green);}
   .badge.PARTIAL{background:var(--amber-bg); color:var(--amber);}
   .badge.BACKORDER{background:var(--red-bg); color:var(--red);}
+  .badge.CANCELED{background:var(--border); color:var(--charcoal);}
 
   .light{display:flex; align-items:center; gap:6px; font-size:12px; white-space:nowrap;}
   .dot{width:10px; height:10px; border-radius:50%; flex-shrink:0; display:inline-block;}
@@ -117,6 +118,7 @@
   .dot.yellow{background:var(--amber);}
   .dot.red{background:var(--red);}
   .dot.off{background:var(--border); border:1px solid var(--mid);}
+  .dot.canceled{background:var(--mid);}
   .dot.none{background:var(--white); border:1px solid var(--mid);}
 
   .modal-bg{display:none; position:fixed; inset:0; background:rgba(20,26,17,.5); align-items:flex-start; justify-content:center; z-index:100; padding:40px 20px; overflow-y:auto;}
@@ -210,6 +212,7 @@
           <option value="DELIVERED">DELIVERED</option>
           <option value="PARTIAL">PARTIAL</option>
           <option value="BACKORDER">BACKORDER</option>
+          <option value="CANCELED">CANCELED</option>
         </select>
         <select id="filter-vendor"><option value="">All vendors</option></select>
         <label style="display:flex;align-items:center;gap:6px;font-weight:normal;font-size:12.5px;color:var(--charcoal);margin:0;">
@@ -402,6 +405,7 @@
             <option value="DELIVERED">DELIVERED</option>
             <option value="PARTIAL">PARTIAL</option>
             <option value="BACKORDER">BACKORDER</option>
+            <option value="CANCELED">CANCELED</option>
           </select>
         </div>
       </div>
@@ -522,6 +526,7 @@ async function fetchData(){
     vendors = data.vendors || [];
     lastFetchError = '';
     setSync('ok');
+    showBanner('dashboard', 'error', '');
     renderAll();
   }catch(e){
     let detail = e.message || String(e);
@@ -562,15 +567,15 @@ function fmtDate(iso){
 function nextPoNumber(){
   const d = new Date();
   const prefix = String(d.getFullYear()).slice(-2) + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
-  let maxSeq = 1000;
-  pos.forEach(p=>{
-    const num = String(p.PO_NUMBER || '');
-    if(num.length >= 4){
-      const seq = parseInt(num.slice(-4), 10);
-      if(!isNaN(seq) && seq > maxSeq) maxSeq = seq;
+  let lastSeq = 1000;
+  for(let i = pos.length - 1; i >= 0; i--){
+    const num = String(pos[i].PO_NUMBER || '').trim();
+    if(/^\d{10}$/.test(num)){
+      lastSeq = parseInt(num.slice(-4), 10);
+      break;
     }
-  });
-  const nextSeq = maxSeq + 1;
+  }
+  const nextSeq = lastSeq + 1;
   return prefix + String(nextSeq).padStart(4, '0');
 }
 function calcLeadTimeDate(vendorName){
@@ -585,8 +590,12 @@ function calcLeadTimeDate(vendorName){
 // Traffic-light Status: based on days remaining until PO_CONFIRMATION_ETA.
 // >=3 days => green, 0-2 days => yellow, already passed => red, DELIVERED => off.
 function computeStatusLight(po){
-  if(String(po.STATUS_PO || '').toUpperCase() === 'DELIVERED'){
+  const statusPo = String(po.STATUS_PO || '').toUpperCase();
+  if(statusPo === 'DELIVERED'){
     return { level:'off', label:'Delivered' };
+  }
+  if(statusPo === 'CANCELED'){
+    return { level:'canceled', label:'Canceled' };
   }
   if(!po.PO_CONFIRMATION_ETA){
     return { level:'none', label:'Awaiting confirmation' };
@@ -656,10 +665,10 @@ const SCORECARD_DEFS = [
 function scorecardCounts(){
   const today = todayISO();
   return {
-    'arriving-today': pos.filter(p => p.PO_CONFIRMATION_ETA === today && !p.REAL_DELIVERY_TIME).length,
+    'arriving-today': pos.filter(p => p.PO_CONFIRMATION_ETA === today && !p.REAL_DELIVERY_TIME && String(p.STATUS_PO || '').toUpperCase() !== 'CANCELED').length,
     'backorder': pos.filter(p => String(p.STATUS_PO || '').toUpperCase() === 'BACKORDER').length,
     'pending-eta': pos.filter(p => String(p.STATUS_PO || 'PENDING').toUpperCase() === 'PENDING' && !!p.PO_CONFIRMATION_ETA).length,
-    'waiting-eta': pos.filter(p => !p.PO_CONFIRMATION_ETA).length,
+    'waiting-eta': pos.filter(p => !p.PO_CONFIRMATION_ETA && String(p.STATUS_PO || '').toUpperCase() !== 'CANCELED').length,
     'overdue': pos.filter(p => computeStatusLight(p).level === 'red').length
   };
 }
@@ -755,9 +764,9 @@ function renderTable(){
       const hay = (String(p.CUSTOMER||'') + ' ' + String(p.PO_NUMBER||'')).toLowerCase();
       if(!hay.includes(search)) return false;
     }
-    if(activeScorecard === 'arriving-today' && !(p.PO_CONFIRMATION_ETA === today && !p.REAL_DELIVERY_TIME)) return false;
+    if(activeScorecard === 'arriving-today' && !(p.PO_CONFIRMATION_ETA === today && !p.REAL_DELIVERY_TIME && String(p.STATUS_PO || '').toUpperCase() !== 'CANCELED')) return false;
     if(activeScorecard === 'pending-eta' && !(String(p.STATUS_PO || 'PENDING').toUpperCase() === 'PENDING' && p.PO_CONFIRMATION_ETA)) return false;
-    if(activeScorecard === 'waiting-eta' && p.PO_CONFIRMATION_ETA) return false;
+    if(activeScorecard === 'waiting-eta' && (p.PO_CONFIRMATION_ETA || String(p.STATUS_PO || '').toUpperCase() === 'CANCELED')) return false;
     return true;
   });
   rows.sort((a,b) => String(b.PO_NUMBER||'').localeCompare(String(a.PO_NUMBER||'')));
@@ -973,7 +982,7 @@ function renderStats(){
   const filtered = statsFilteredPos();
   const total = filtered.length;
 
-  const byStatus = { PENDING:0, DELIVERED:0, PARTIAL:0, BACKORDER:0 };
+  const byStatus = { PENDING:0, DELIVERED:0, PARTIAL:0, BACKORDER:0, CANCELED:0 };
   filtered.forEach(p => {
     const s = String(p.STATUS_PO || 'PENDING').toUpperCase();
     if(byStatus[s] !== undefined) byStatus[s]++;
@@ -1008,7 +1017,7 @@ function renderStats(){
     kpiCard('Total Debt', money(totalDebt))
   ].join('');
 
-  const statusColors = { PENDING:'var(--border)', DELIVERED:'var(--green)', PARTIAL:'var(--amber)', BACKORDER:'var(--red)' };
+  const statusColors = { PENDING:'var(--border)', DELIVERED:'var(--green)', PARTIAL:'var(--amber)', BACKORDER:'var(--red)', CANCELED:'var(--mid)' };
   document.getElementById('stats-status-bars').innerHTML = Object.keys(byStatus).map(s => {
     const pct = total ? Math.round(byStatus[s] / total * 100) : 0;
     return '<div class="bar-row"><div class="bar-label">' + s + '</div>' +
@@ -1149,6 +1158,10 @@ document.querySelectorAll('.navbtn').forEach(btn => {
 
   if(isConfigured){
     await fetchData();
+    for(let attempt = 0; attempt < 2 && lastFetchError; attempt++){
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      await fetchData();
+    }
     if(lastFetchError && config.readUrl !== DEFAULT_READ_URL){
       config.readUrl = DEFAULT_READ_URL;
       config.writeUrl = DEFAULT_WRITE_URL;
