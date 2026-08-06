@@ -188,10 +188,6 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="13" height="10" rx="1.5"/><path d="M15 10h4l3 3v4h-7z"/><circle cx="7" cy="19" r="1.6"/><circle cx="17.5" cy="19" r="1.6"/></svg>
       <span>Vendors</span>
     </button>
-    <button class="navbtn" data-tab="settings">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>
-      <span>Settings</span>
-    </button>
     <div class="navfoot"><span id="syncdot"></span><span id="syncstate">Not connected</span></div>
   </nav>
 
@@ -349,41 +345,6 @@
       </div>
     </section>
 
-    <!-- SETTINGS -->
-    <section id="tab-settings" style="display:none;">
-      <h1>Settings</h1>
-      <div class="pagesub">Paste your Google Apps Script (Web app deployment) URL here.</div>
-      <div id="banner-settings"></div>
-      <div class="card">
-        <div class="field">
-          <label>Read URL</label>
-          <input type="text" id="cfg-read" placeholder="https://script.google.com/macros/s/XXXXXXXX/exec">
-        </div>
-        <div class="field">
-          <label>Write URL</label>
-          <input type="text" id="cfg-write" placeholder="https://script.google.com/macros/s/XXXXXXXX/exec">
-          <div class="hint">With Google Sheets, this is usually the same URL in both fields.</div>
-        </div>
-        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-          <button class="primary" id="btn-save-config">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-            Save & Connect
-          </button>
-          <button class="secondary" id="btn-test-config">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7z"/></svg>
-            Test Connection
-          </button>
-          <button class="secondary" id="btn-open-url">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M10 14 20 4M19 13v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h6"/></svg>
-            Open URL in new tab
-          </button>
-          <button class="secondary" id="btn-reset-config">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v6h6M20 20v-6h-6"/><path d="M5.5 9a7.5 7.5 0 0 1 12.6-3.5L20 8M18.5 15a7.5 7.5 0 0 1-12.6 3.5L4 16"/></svg>
-            Reset to default URL
-          </button>
-        </div>
-      </div>
-    </section>
   </main>
 </div>
 
@@ -465,36 +426,17 @@
 </div>
 
 <script>
-// Default Apps Script Web App URL — baked into the file so a fresh deploy
-// (or a browser with no saved settings) is already connected out of the box.
-// You can still change it later from the Settings tab; that override is
-// remembered in this browser and takes priority over the default below.
+// The connection URL is fixed in the source code on purpose — there is no
+// in-app way to view or change it. To point this app at a different Apps
+// Script deployment, edit these two constants directly and redeploy.
 const DEFAULT_READ_URL = 'https://script.google.com/macros/s/AKfycbzt6zbWjq5PLrXvXe8Nwf5sCfLFPuTEq07y3XoBVwNZ24tpzNMbT_3oSB1GmMBOpXvP/exec';
 const DEFAULT_WRITE_URL = 'https://script.google.com/macros/s/AKfycbzt6zbWjq5PLrXvXe8Nwf5sCfLFPuTEq07y3XoBVwNZ24tpzNMbT_3oSB1GmMBOpXvP/exec';
 
-let config = { readUrl: DEFAULT_READ_URL, writeUrl: DEFAULT_WRITE_URL };
 let pos = [];
 let vendors = [];
 let editingPoNumber = null;
 let lastFetchError = '';
 let activeScorecard = null;
-
-// ---------- storage ----------
-function loadConfig(){
-  try{
-    const raw = localStorage.getItem('po_tracker_config');
-    if(raw){
-      const saved = JSON.parse(raw);
-      if(saved.readUrl) config.readUrl = saved.readUrl;
-      if(saved.writeUrl) config.writeUrl = saved.writeUrl;
-    }
-  }catch(e){ /* no saved override, or localStorage unavailable - default stays */ }
-}
-function persistConfig(){
-  try{
-    localStorage.setItem('po_tracker_config', JSON.stringify(config));
-  }catch(e){ /* localStorage unavailable - config just won't persist across reloads */ }
-}
 
 // ---------- sync status ----------
 function setSync(state){
@@ -516,10 +458,9 @@ function showBanner(tabId, type, text){
 
 // ---------- data fetch ----------
 async function fetchData(){
-  if(!config.readUrl){ setSync('idle'); return; }
   setSync('loading');
   try{
-    const res = await fetch(config.readUrl, { method:'GET' });
+    const res = await fetch(DEFAULT_READ_URL, { method:'GET' });
     if(!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     pos = data.pos || [];
@@ -531,20 +472,19 @@ async function fetchData(){
   }catch(e){
     let detail = e.message || String(e);
     try{
-      await fetch(config.readUrl, { method:'GET', mode:'no-cors' });
+      await fetch(DEFAULT_READ_URL, { method:'GET', mode:'no-cors' });
       detail += ' | Diagnostic: the server DID respond — this is a CORS policy block, not a network block.';
     }catch(e2){
       detail += ' | Diagnostic: the connection did not go through even without CORS — this may be a network block.';
     }
     lastFetchError = detail;
     setSync('err');
-    showBanner('dashboard', 'error', 'Could not read the spreadsheet. Check the Read URL in Settings. (' + detail + ')');
+    showBanner('dashboard', 'error', 'Could not read the spreadsheet right now. (' + detail + ')');
   }
 }
 
 async function writeData(payload){
-  if(!config.writeUrl){ throw new Error('Write URL is not configured.'); }
-  const res = await fetch(config.writeUrl, {
+  const res = await fetch(DEFAULT_WRITE_URL, {
     method:'POST',
     headers:{'Content-Type':'text/plain;charset=utf-8'},
     body: JSON.stringify(payload)
@@ -1089,51 +1029,6 @@ document.getElementById('btn-stats-clear').addEventListener('click', () => {
   renderStats();
 });
 
-// ---------- settings ----------
-document.getElementById('btn-open-url').addEventListener('click', () => {
-  const url = document.getElementById('cfg-read').value.trim();
-  if(!url){ alert('First type or paste the Read URL.'); return; }
-  window.open(url, '_blank');
-});
-
-document.getElementById('btn-reset-config').addEventListener('click', async () => {
-  try{ localStorage.removeItem('po_tracker_config'); }catch(e){ /* ignore */ }
-  config.readUrl = DEFAULT_READ_URL;
-  config.writeUrl = DEFAULT_WRITE_URL;
-  document.getElementById('cfg-read').value = DEFAULT_READ_URL;
-  document.getElementById('cfg-write').value = DEFAULT_WRITE_URL;
-  showBanner('settings','warn','Cleared saved settings. Reconnecting with the default URL...');
-  await fetchData();
-  if(document.getElementById('syncstate').textContent.startsWith('Connected')){
-    showBanner('settings','info','Connected successfully using the default URL.');
-  }else{
-    showBanner('settings','error','Still could not connect. Error detail: "' + lastFetchError + '".');
-  }
-});
-
-document.getElementById('btn-test-config').addEventListener('click', async () => {
-  showBanner('settings','warn','Testing connection...');
-  await fetchData();
-  if(document.getElementById('syncstate').textContent.startsWith('Connected')){
-    showBanner('settings','info','Connection successful. Loaded ' + pos.length + ' POs and ' + vendors.length + ' vendors.');
-  }else{
-    showBanner('settings','error','Could not connect. Error detail: "' + lastFetchError + '". Check the URL and that access is set to "Anyone".');
-  }
-});
-
-document.getElementById('btn-save-config').addEventListener('click', async () => {
-  config.readUrl = document.getElementById('cfg-read').value.trim();
-  config.writeUrl = document.getElementById('cfg-write').value.trim();
-  persistConfig();
-  showBanner('settings','info','Settings saved. Connecting...');
-  await fetchData();
-  if(document.getElementById('syncstate').textContent.startsWith('Connected')){
-    showBanner('settings','info','Connected successfully.');
-  }else{
-    showBanner('settings','error','Saved, but could not connect. Error detail: "' + lastFetchError + '".');
-  }
-});
-
 // ---------- nav ----------
 document.querySelectorAll('.navbtn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -1151,29 +1046,10 @@ document.querySelectorAll('.navbtn').forEach(btn => {
   document.getElementById('stats-to').value = todayISO();
   document.getElementById('stats-from').value = fromDefault.getFullYear() + '-' + String(fromDefault.getMonth()+1).padStart(2,'0') + '-' + String(fromDefault.getDate()).padStart(2,'0');
 
-  loadConfig();
-  const isConfigured = config.readUrl && !config.readUrl.includes('PASTE_YOUR_APPS_SCRIPT_URL_HERE');
-  document.getElementById('cfg-read').value = isConfigured ? config.readUrl : '';
-  document.getElementById('cfg-write').value = (config.writeUrl && !config.writeUrl.includes('PASTE_YOUR_APPS_SCRIPT_URL_HERE')) ? config.writeUrl : '';
-
-  if(isConfigured){
+  await fetchData();
+  for(let attempt = 0; attempt < 2 && lastFetchError; attempt++){
+    await new Promise(resolve => setTimeout(resolve, 1500));
     await fetchData();
-    for(let attempt = 0; attempt < 2 && lastFetchError; attempt++){
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      await fetchData();
-    }
-    if(lastFetchError && config.readUrl !== DEFAULT_READ_URL){
-      config.readUrl = DEFAULT_READ_URL;
-      config.writeUrl = DEFAULT_WRITE_URL;
-      await fetchData();
-    }
-  }else{
-    setSync('idle');
-    document.querySelectorAll('.navbtn').forEach(b=>b.classList.remove('active'));
-    document.querySelector('[data-tab="settings"]').classList.add('active');
-    document.querySelectorAll('main > section').forEach(s => s.style.display = 'none');
-    document.getElementById('tab-settings').style.display = 'block';
-    showBanner('settings','warn','You haven\'t connected your spreadsheet yet. Paste your Google Apps Script URL and save.');
   }
   setInterval(fetchData, 180000); // auto-refresh every 3 min
 })();
