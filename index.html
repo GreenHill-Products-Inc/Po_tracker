@@ -356,7 +356,7 @@
       <span class="lbl">Status (auto):</span>
       <span class="light" id="modal-status-light"><span class="dot none"></span><span>—</span></span>
     </div>
-    <form id="form-edit">
+    <form id="form-edit" novalidate>
       <div class="grid2">
         <div class="field"><label>PO Confirmation ETA</label><input type="date" id="e-confeta"></div>
         <div class="field">
@@ -429,8 +429,8 @@
 // The connection URL is fixed in the source code on purpose — there is no
 // in-app way to view or change it. To point this app at a different Apps
 // Script deployment, edit these two constants directly and redeploy.
-const DEFAULT_READ_URL = 'https://script.google.com/macros/s/AKfycbzt6zbWjq5PLrXvXe8Nwf5sCfLFPuTEq07y3XoBVwNZ24tpzNMbT_3oSB1GmMBOpXvP/exec';
-const DEFAULT_WRITE_URL = 'https://script.google.com/macros/s/AKfycbzt6zbWjq5PLrXvXe8Nwf5sCfLFPuTEq07y3XoBVwNZ24tpzNMbT_3oSB1GmMBOpXvP/exec';
+const DEFAULT_READ_URL = 'https://script.google.com/macros/s/AKfycbz94mntkAnkiqbSWG8u7ESqVuNZzrQmg7NXc8JLoLHKT1eTwThWU-CDxhfr2l9SNPXH/exec';
+const DEFAULT_WRITE_URL = 'https://script.google.com/macros/s/AKfycbz94mntkAnkiqbSWG8u7ESqVuNZzrQmg7NXc8JLoLHKT1eTwThWU-CDxhfr2l9SNPXH/exec';
 
 let pos = [];
 let vendors = [];
