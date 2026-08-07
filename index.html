@@ -212,7 +212,10 @@
         </select>
         <select id="filter-vendor"><option value="">All vendors</option></select>
         <label style="display:flex;align-items:center;gap:6px;font-weight:normal;font-size:12.5px;color:var(--charcoal);margin:0;">
-          <input type="checkbox" id="filter-overdue" style="width:auto;"> Overdue only
+          From <input type="date" id="filter-datefrom" style="width:auto;">
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-weight:normal;font-size:12.5px;color:var(--charcoal);margin:0;">
+          To <input type="date" id="filter-dateto" style="width:auto;">
         </label>
         <button class="secondary" id="btn-refresh">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v6h6M20 20v-6h-6"/><path d="M5.5 9a7.5 7.5 0 0 1 12.6-3.5L20 8M18.5 15a7.5 7.5 0 0 1-12.6 3.5L4 16"/></svg>
@@ -387,17 +390,17 @@
       <div class="section-title">Invoices</div>
       <div class="invoicegrid">
         <div class="field"><label>Description 2</label><input type="text" id="e-desc2"></div>
-        <div class="field"><label>Invoice 1</label><input type="text" id="e-inv1"></div>
+        <div class="field"><label>Invoice 1</label><input type="number" step="0.01" id="e-inv1"></div>
         <div class="field"><label>Description 3</label><input type="text" id="e-desc3"></div>
-        <div class="field"><label>Invoice 2</label><input type="text" id="e-inv2"></div>
+        <div class="field"><label>Invoice 2</label><input type="number" step="0.01" id="e-inv2"></div>
         <div class="field"><label>Description 4</label><input type="text" id="e-desc4"></div>
-        <div class="field"><label>Invoice 3</label><input type="text" id="e-inv3"></div>
+        <div class="field"><label>Invoice 3</label><input type="number" step="0.01" id="e-inv3"></div>
         <div class="field"><label>Description 5</label><input type="text" id="e-desc5"></div>
-        <div class="field"><label>Invoice 4</label><input type="text" id="e-inv4"></div>
+        <div class="field"><label>Invoice 4</label><input type="number" step="0.01" id="e-inv4"></div>
       </div>
       <div class="grid2" style="margin-top:14px;">
         <div class="field"><label>Description 6</label><input type="text" id="e-desc6"></div>
-        <div class="field"><label>Debt</label><input type="number" step="0.01" id="e-debt"></div>
+        <div class="field"><label>Debt (Cost of PO − Invoices 1-4)</label><input type="number" step="0.01" id="e-debt" disabled></div>
       </div>
       <div class="modal-actions">
         <button type="button" class="secondary" id="btn-cancel-edit">Cancel</button>
@@ -633,7 +636,8 @@ function clearStandardFilters(){
   document.getElementById('filter-search').value = '';
   document.getElementById('filter-statuspo').value = '';
   document.getElementById('filter-vendor').value = '';
-  document.getElementById('filter-overdue').checked = false;
+  document.getElementById('filter-datefrom').value = '';
+  document.getElementById('filter-dateto').value = '';
 }
 
 function applyScorecardFilter(key){
@@ -648,8 +652,6 @@ function applyScorecardFilter(key){
   clearStandardFilters();
   if(key === 'backorder'){
     document.getElementById('filter-statuspo').value = 'BACKORDER';
-  }else if(key === 'overdue'){
-    document.getElementById('filter-overdue').checked = true;
   }
   renderScorecards();
   renderTable();
@@ -693,13 +695,16 @@ function renderTable(){
   const search = document.getElementById('filter-search').value.trim().toLowerCase();
   const statusPoF = document.getElementById('filter-statuspo').value;
   const vendorF = document.getElementById('filter-vendor').value;
-  const overdueOnly = document.getElementById('filter-overdue').checked;
+  const dateFrom = document.getElementById('filter-datefrom').value;
+  const dateTo = document.getElementById('filter-dateto').value;
   const today = todayISO();
 
   let rows = pos.filter(p => {
     if(statusPoF && p.STATUS_PO !== statusPoF) return false;
     if(vendorF && p.VENDOR !== vendorF) return false;
-    if(overdueOnly && computeStatusLight(p).level !== 'red') return false;
+    if((dateFrom || dateTo) && !p.PO_CREATION_DATE) return false;
+    if(dateFrom && p.PO_CREATION_DATE < dateFrom) return false;
+    if(dateTo && p.PO_CREATION_DATE > dateTo) return false;
     if(search){
       const hay = (String(p.CUSTOMER||'') + ' ' + String(p.PO_NUMBER||'')).toLowerCase();
       if(!hay.includes(search)) return false;
@@ -707,6 +712,7 @@ function renderTable(){
     if(activeScorecard === 'arriving-today' && !(p.PO_CONFIRMATION_ETA === today && !p.REAL_DELIVERY_TIME && String(p.STATUS_PO || '').toUpperCase() !== 'CANCELED')) return false;
     if(activeScorecard === 'pending-eta' && !(String(p.STATUS_PO || 'PENDING').toUpperCase() === 'PENDING' && p.PO_CONFIRMATION_ETA)) return false;
     if(activeScorecard === 'waiting-eta' && (p.PO_CONFIRMATION_ETA || String(p.STATUS_PO || '').toUpperCase() === 'CANCELED')) return false;
+    if(activeScorecard === 'overdue' && computeStatusLight(p).level !== 'red') return false;
     return true;
   });
   rows.sort((a,b) => String(b.PO_NUMBER||'').localeCompare(String(a.PO_NUMBER||'')));
@@ -831,6 +837,18 @@ document.getElementById('form-vendor').addEventListener('submit', async (e) => {
 });
 
 // ---------- edit PO modal ----------
+// Debt is never entered by hand — it's always Cost of PO minus Invoices 1-4.
+function recomputeDebtPreview(){
+  const cost = parseFloat(document.getElementById('e-cost').value) || 0;
+  const inv1 = parseFloat(document.getElementById('e-inv1').value) || 0;
+  const inv2 = parseFloat(document.getElementById('e-inv2').value) || 0;
+  const inv3 = parseFloat(document.getElementById('e-inv3').value) || 0;
+  const inv4 = parseFloat(document.getElementById('e-inv4').value) || 0;
+  const debt = cost - inv1 - inv2 - inv3 - inv4;
+  document.getElementById('e-debt').value = debt.toFixed(2);
+  return debt;
+}
+
 function openEditModal(poNumber){
   const po = pos.find(p => String(p.PO_NUMBER) === String(poNumber));
   if(!po) return;
@@ -855,11 +873,14 @@ function openEditModal(poNumber){
   document.getElementById('e-desc5').value = po.DESCRIPTION_5 || '';
   document.getElementById('e-inv4').value = po.INVOICE_4 || '';
   document.getElementById('e-desc6').value = po.DESCRIPTION_6 || '';
-  document.getElementById('e-debt').value = po.DEBT || '';
+  recomputeDebtPreview();
   document.getElementById('modal-bg').classList.add('show');
 }
 document.getElementById('btn-cancel-edit').addEventListener('click', () => {
   document.getElementById('modal-bg').classList.remove('show');
+});
+['e-cost','e-inv1','e-inv2','e-inv3','e-inv4'].forEach(id => {
+  document.getElementById(id).addEventListener('input', recomputeDebtPreview);
 });
 document.getElementById('form-edit').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -885,7 +906,7 @@ document.getElementById('form-edit').addEventListener('submit', async (e) => {
     DESCRIPTION_5: document.getElementById('e-desc5').value,
     INVOICE_4: document.getElementById('e-inv4').value,
     DESCRIPTION_6: document.getElementById('e-desc6').value,
-    DEBT: document.getElementById('e-debt').value
+    DEBT: recomputeDebtPreview().toFixed(2)
   };
   try{
     await writeData({ action:'updatePo', po });
@@ -1007,7 +1028,7 @@ function renderStats(){
 }
 
 // ---------- filters ----------
-['filter-search','filter-statuspo','filter-vendor','filter-overdue'].forEach(id => {
+['filter-search','filter-statuspo','filter-vendor','filter-datefrom','filter-dateto'].forEach(id => {
   const handler = () => {
     activeScorecard = null;
     document.querySelectorAll('.scorecard').forEach(el => el.classList.remove('active'));
