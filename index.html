@@ -151,6 +151,17 @@
   .bar-fill{height:100%; border-radius:4px;}
   .bar-value{width:70px; text-align:right; font-size:12px; font-weight:700; flex-shrink:0;}
 
+  /* General fluid behavior at all sizes, before any breakpoint kicks in */
+  html, body{max-width:100%; overflow-x:hidden;}
+  #app{min-width:0;}
+  main{min-width:0;}
+  .card, .tablewrap, .toolbar{max-width:100%;}
+
+  @media (max-width: 1200px){
+    main{padding:24px 22px;}
+    nav{width:200px; padding:16px 10px;}
+  }
+
   @media (max-width: 900px){
     #app{flex-direction:column;}
     nav{width:100%; flex-direction:row; align-items:center; padding:10px 14px; overflow-x:auto;}
@@ -159,12 +170,25 @@
     .navbtn{white-space:nowrap; margin-bottom:0; margin-right:6px;}
     .navbtn span{display:inline;}
     .navfoot{display:none;}
-    main{padding:20px;}
-    .grid2{grid-template-columns:1fr;}
+    main{padding:18px;}
+    .grid2, .invoicegrid{grid-template-columns:1fr;}
     .scorecards{grid-template-columns:repeat(2, 1fr);}
+    .kpi-grid{grid-template-columns:repeat(2, 1fr);}
+    .toolbar{gap:8px;}
+    .toolbar input, .toolbar select{min-width:130px; flex:1 1 130px;}
+    .card{padding:16px;}
+    table{font-size:11.5px;}
+    th, td{padding:7px 8px;}
+    .modal-bg{padding:16px 10px;}
+    .modal{padding:18px;}
   }
+
   @media (max-width: 520px){
     .scorecards{grid-template-columns:1fr;}
+    .kpi-grid{grid-template-columns:1fr;}
+    h1{font-size:19px;}
+    .toolbar input, .toolbar select{flex:1 1 100%;}
+    button.primary, button.secondary{padding:10px 14px; font-size:12.5px;}
   }
 </style>
 </head>
@@ -273,6 +297,22 @@
             <div class="field"><label>PO Creation Date</label><input type="text" id="f-creationdate" disabled></div>
             <div class="field"><label>Vendor Lead Time — estimated ETA</label><input type="text" id="f-leadtime" disabled></div>
           </div>
+
+          <div class="field" id="description-plain-wrap">
+            <label>Description</label>
+            <textarea id="f-description-plain" rows="2"></textarea>
+          </div>
+
+          <div id="glass-config-wrap" style="display:none; margin-bottom:28px;">
+            <div class="section-title">Glass Details</div>
+            <div class="hint" style="margin-bottom:10px;">This vendor uses a structured description — fill in each glass below. Click "+ Add another glass" if this PO includes more than one.</div>
+            <div id="glass-blocks"></div>
+            <button type="button" class="link" id="btn-add-glass" style="margin-top:10px;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+              Add another glass
+            </button>
+          </div>
+
           <button type="submit" class="primary" id="btn-submit-po">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
             Create PO
@@ -767,7 +807,109 @@ function updateLeadTimePreview(){
 }
 
 // ---------- new PO ----------
-document.getElementById('f-vendor').addEventListener('change', updateLeadTimePreview);
+
+// These vendors get a structured glass-description form instead of free text.
+const GLASS_VENDORS = ['aldora (3/16 glass)', 'aldora (1/4 and 3/8 glass)', 'basco'];
+let glassBlockSeq = 0;
+
+function isGlassVendor(vendorName){
+  return GLASS_VENDORS.indexOf(String(vendorName || '').trim().toLowerCase()) !== -1;
+}
+
+function createGlassBlock(){
+  glassBlockSeq++;
+  const div = document.createElement('div');
+  div.className = 'card glass-block';
+  div.dataset.blockId = 'gb-' + glassBlockSeq;
+
+  const row0 = document.createElement('div');
+  row0.className = 'grid2';
+  row0.innerHTML =
+    '<div class="field"><label>Quantity</label><input type="number" min="1" class="g-qty" placeholder="e.g. 1"></div>' +
+    '<div class="field"><label>Thickness (inches)</label><input type="text" class="g-thickness" placeholder="e.g. 3/16"></div>';
+
+  const row1 = document.createElement('div');
+  row1.className = 'grid2';
+  row1.innerHTML =
+    '<div class="field"><label>Tempered</label><select class="g-tempered"><option value="No">No</option><option value="Yes">Yes</option></select></div>' +
+    '<div class="field"><label>Polished</label><select class="g-polished">' +
+      '<option value="ALL POLISHED">All Polished</option>' +
+      '<option value="POLISHED">Polished</option>' +
+      '<option value="NO POLISHED">No Polished</option>' +
+    '</select></div>';
+
+  const row2 = document.createElement('div');
+  row2.className = 'grid2';
+  row2.innerHTML =
+    '<div class="field"><label>Width</label><input type="text" class="g-width" placeholder="e.g. 24"></div>' +
+    '<div class="field"><label>Height</label><input type="text" class="g-height" placeholder="e.g. 36"></div>';
+
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.className = 'secondary';
+  removeBtn.textContent = 'Remove this glass';
+  removeBtn.addEventListener('click', () => {
+    if(document.querySelectorAll('#glass-blocks .glass-block').length > 1){
+      div.remove();
+    }
+  });
+
+  div.appendChild(row0);
+  div.appendChild(row1);
+  div.appendChild(row2);
+  div.appendChild(removeBtn);
+  return div;
+}
+
+function resetGlassBlocks(){
+  const container = document.getElementById('glass-blocks');
+  container.innerHTML = '';
+  container.appendChild(createGlassBlock());
+}
+
+function glassBlockToDescription(blockEl){
+  const qty = blockEl.querySelector('.g-qty').value.trim();
+  const thickness = blockEl.querySelector('.g-thickness').value.trim();
+  const tempered = blockEl.querySelector('.g-tempered').value;
+  const polished = blockEl.querySelector('.g-polished').value;
+  const width = blockEl.querySelector('.g-width').value.trim();
+  const height = blockEl.querySelector('.g-height').value.trim();
+
+  let thicknessPart = thickness ? (thickness + '"') : '';
+  if(tempered === 'Yes'){
+    thicknessPart = thicknessPart ? (thicknessPart + ' TEMP') : 'TEMP';
+  }
+  const parts = [];
+  if(qty) parts.push('Qty: ' + qty);
+  if(thicknessPart) parts.push(thicknessPart);
+  parts.push(polished);
+  if(width || height) parts.push((width ? width + '"' : '?') + ' x ' + (height ? height + '"' : '?'));
+  return parts.join(' - ');
+}
+
+function buildGlassDescription(){
+  const blocks = document.querySelectorAll('#glass-blocks .glass-block');
+  const parts = Array.from(blocks).map(glassBlockToDescription).filter(Boolean);
+  return parts.join('; ');
+}
+
+function updateDescriptionMode(){
+  const vendorName = document.getElementById('f-vendor').value;
+  const glass = isGlassVendor(vendorName);
+  document.getElementById('description-plain-wrap').style.display = glass ? 'none' : 'block';
+  document.getElementById('glass-config-wrap').style.display = glass ? 'block' : 'none';
+  if(glass && document.getElementById('glass-blocks').children.length === 0){
+    resetGlassBlocks();
+  }
+}
+document.getElementById('btn-add-glass').addEventListener('click', () => {
+  document.getElementById('glass-blocks').appendChild(createGlassBlock());
+});
+
+document.getElementById('f-vendor').addEventListener('change', () => {
+  updateLeadTimePreview();
+  updateDescriptionMode();
+});
 
 document.getElementById('form-new').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -775,6 +917,9 @@ document.getElementById('form-new').addEventListener('submit', async (e) => {
   if(!vendorName){ showBanner('new','error','Please select a vendor.'); return; }
   const btn = document.getElementById('btn-submit-po');
   btn.disabled = true;
+  const description = isGlassVendor(vendorName)
+    ? buildGlassDescription()
+    : document.getElementById('f-description-plain').value;
   const po = {
     CUSTOMER: document.getElementById('f-customer').value,
     ADDRESS: document.getElementById('f-address').value,
@@ -784,12 +929,15 @@ document.getElementById('form-new').addEventListener('submit', async (e) => {
     PO_NUMBER: document.getElementById('f-ponumber').value,
     PO_CREATION_DATE: todayISO(),
     VENDOR_LEAD_TIME: calcLeadTimeDate(vendorName),
-    STATUS_PO: 'PENDING'
+    STATUS_PO: 'PENDING',
+    DESCRIPTION: description
   };
   try{
     await writeData({ action:'addPo', po });
     showBanner('new','info','PO ' + po.PO_NUMBER + ' created successfully.');
     document.getElementById('form-new').reset();
+    resetGlassBlocks();
+    updateDescriptionMode();
     await fetchData();
   }catch(err){
     showBanner('new','error','Could not create PO: ' + err.message);
