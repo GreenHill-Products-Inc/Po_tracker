@@ -211,9 +211,8 @@
   .po-print .foot-note{font-size:11px; color:var(--mid); margin-top:30px;}
 
   @media print{
-    body *{visibility:hidden;}
-    #print-po-content, #print-po-content *{visibility:visible;}
-    #print-po-content{display:block !important; position:absolute; top:0; left:0; width:100%;}
+    #app, .modal-bg{display:none !important;}
+    #print-po-content{display:block !important;}
   }
 </style>
 </head>
