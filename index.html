@@ -190,6 +190,31 @@
     .toolbar input, .toolbar select{flex:1 1 100%;}
     button.primary, button.secondary{padding:10px 14px; font-size:12.5px;}
   }
+
+  /* Printable PO document */
+  #print-po-content{display:none;}
+  .po-print{font-family:Arial, Helvetica, sans-serif; color:var(--dark); padding:10px;}
+  .po-print-header{display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:28px;}
+  .po-print-header img{height:46px; width:auto;}
+  .po-print-header h1{font-size:20px; color:var(--dark); margin:0; letter-spacing:.5px;}
+  .po-print-meta{display:flex; justify-content:space-between; margin-bottom:22px; font-size:13px;}
+  .po-print-meta .label{color:var(--mid); font-weight:600; display:inline-block; width:110px;}
+  .po-print-meta .ponum{color:var(--deep-green); font-weight:800; font-size:15px;}
+  .po-print-boxes{display:flex; gap:18px; margin-bottom:22px;}
+  .po-print-box{flex:1; border:1px solid var(--border); border-radius:8px; overflow:hidden;}
+  .po-print-box .box-title{background:var(--green); color:var(--white); font-weight:800; font-size:11px; letter-spacing:.5px; padding:6px 12px;}
+  .po-print-box .box-body{padding:12px; font-size:13px; line-height:1.5;}
+  .po-print-box .box-body .name{font-weight:700; margin-bottom:2px;}
+  .po-print table{width:100%; border-collapse:collapse; margin-bottom:22px; font-size:12.5px;}
+  .po-print th{background:var(--green); color:var(--white); text-align:left; padding:8px 10px; font-size:11px; letter-spacing:.3px;}
+  .po-print td{padding:8px 10px; border-bottom:1px solid var(--border);}
+  .po-print .foot-note{font-size:11px; color:var(--mid); margin-top:30px;}
+
+  @media print{
+    body *{visibility:hidden;}
+    #print-po-content, #print-po-content *{visibility:visible;}
+    #print-po-content{display:block !important; position:absolute; top:0; left:0; width:100%;}
+  }
 </style>
 </head>
 <body>
@@ -274,8 +299,8 @@
             <div class="field"><label>Address</label><input type="text" id="f-address" required></div>
           </div>
           <div class="grid2">
-            <div class="field"><label>Lot / House</label><input type="text" id="f-lot" required></div>
-            <div class="field"><label>Phases</label><input type="text" id="f-phases" required></div>
+            <div class="field"><label>Lot / House</label><input type="text" id="f-lot"></div>
+            <div class="field"><label>Phases</label><input type="text" id="f-phases" required style="text-transform:uppercase;"></div>
           </div>
           <div class="grid2">
             <div class="field">
@@ -443,6 +468,10 @@
         <div class="field"><label>Debt (Cost of PO − Invoices 1-4)</label><input type="number" step="0.01" id="e-debt" disabled></div>
       </div>
       <div class="modal-actions">
+        <button type="button" class="secondary" id="btn-print-po">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+          Print PO
+        </button>
         <button type="button" class="secondary" id="btn-cancel-edit">Cancel</button>
         <button type="submit" class="primary">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
@@ -611,6 +640,86 @@ function formatOverdue(n){
 
 function esc(s){
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ---------- printable PO document ----------
+// GreenHill's fixed receiving warehouse — where every vendor ships to.
+const SHIP_TO_ADDRESS = {
+  name: 'GREENHILL PRODUCTS INC',
+  lines: ['Warehouse', '3840 Wesley Street', 'Myrtle Beach, SC 29578', '(843) 503-4441']
+};
+
+// Splits a Description into print-table rows. Glass-vendor descriptions look
+// like "Qty: 3 - 3/16\" TEMP - ALL POLISHED - 24\" x 36\"; Qty: 1 - ..." —
+// each "; "-separated item becomes its own row, with the quantity pulled out
+// into its own column. Plain descriptions just become a single row.
+function parsePrintRows(description){
+  if(!description) return [{ desc:'', qty:'' }];
+  const items = String(description).split(';').map(s => s.trim()).filter(Boolean);
+  if(items.length === 0) return [{ desc:'', qty:'' }];
+  return items.map(item => {
+    const m = item.match(/^Qty:\s*(\d+)\s*-\s*(.*)$/i);
+    if(m) return { desc: m[2], qty: m[1] };
+    return { desc: item, qty: '' };
+  });
+}
+
+function printPO(poNumber){
+  const po = pos.find(p => String(p.PO_NUMBER) === String(poNumber));
+  if(!po){ alert('Could not find that PO to print.'); return; }
+
+  const logoSrc = document.querySelector('.logo-chip img').src;
+  const rows = parsePrintRows(po.DESCRIPTION);
+  const rowsHtml = rows.map(r =>
+    '<tr><td>' + esc(r.desc) + '</td><td style="text-align:center;">Pcs</td><td style="text-align:center;">' + esc(r.qty) + '</td></tr>'
+  ).join('');
+
+  const html =
+    '<div class="po-print">' +
+      '<div class="po-print-header">' +
+        '<img src="' + logoSrc + '" alt="GreenHill Products">' +
+        '<h1>PURCHASE ORDER</h1>' +
+      '</div>' +
+      '<div class="po-print-meta">' +
+        '<div>' +
+          '<div><span class="label">Date ordered:</span> ' + fmtDate(po.PO_CREATION_DATE) + '</div>' +
+          '<div><span class="label">Est. Delivery:</span> ' + fmtDate(po.VENDOR_LEAD_TIME) + '</div>' +
+        '</div>' +
+        '<div><span class="label">Purchase Order #:</span> <span class="ponum">' + esc(po.PO_NUMBER) + '</span></div>' +
+      '</div>' +
+      '<div class="po-print-boxes">' +
+        '<div class="po-print-box">' +
+          '<div class="box-title">VENDOR</div>' +
+          '<div class="box-body"><div class="name">' + esc(po.VENDOR) + '</div></div>' +
+        '</div>' +
+        '<div class="po-print-box">' +
+          '<div class="box-title">SHIP TO</div>' +
+          '<div class="box-body"><div class="name">' + esc(SHIP_TO_ADDRESS.name) + '</div>' +
+            SHIP_TO_ADDRESS.lines.map(l => '<div>' + esc(l) + '</div>').join('') +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<table>' +
+        '<thead><tr><th>Description</th><th style="text-align:center;">Unit of Measure</th><th style="text-align:center;">Quantity</th></tr></thead>' +
+        '<tbody>' + rowsHtml + '</tbody>' +
+      '</table>' +
+      '<div class="po-print-boxes">' +
+        '<div class="po-print-box">' +
+          '<div class="box-title">CUSTOMER</div>' +
+          '<div class="box-body">' +
+            '<div class="name">' + esc(po.CUSTOMER) + '</div>' +
+            '<div>' + esc(po.ADDRESS) + '</div>' +
+            '<div>Lot / House: ' + esc(po.LOT_HOUSE) + '</div>' +
+            '<div>Phase: ' + esc(po.PHASES) + '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="po-print-box" style="visibility:hidden;"></div>' +
+      '</div>' +
+      '<div class="foot-note">GreenHill Products Inc — generated from the PO Tracker</div>' +
+    '</div>';
+
+  document.getElementById('print-po-content').innerHTML = html;
+  window.print();
 }
 
 // ---------- date helpers (Statistics) ----------
@@ -906,6 +1015,12 @@ document.getElementById('btn-add-glass').addEventListener('click', () => {
   document.getElementById('glass-blocks').appendChild(createGlassBlock());
 });
 
+document.getElementById('f-phases').addEventListener('input', function(){
+  const pos = this.selectionStart;
+  this.value = this.value.toUpperCase();
+  this.setSelectionRange(pos, pos);
+});
+
 document.getElementById('f-vendor').addEventListener('change', () => {
   updateLeadTimePreview();
   updateDescriptionMode();
@@ -934,11 +1049,14 @@ document.getElementById('form-new').addEventListener('submit', async (e) => {
   };
   try{
     await writeData({ action:'addPo', po });
-    showBanner('new','info','PO ' + po.PO_NUMBER + ' created successfully.');
+    await fetchData();
+    document.getElementById('banner-new').innerHTML =
+      '<div class="banner info">PO ' + esc(po.PO_NUMBER) + ' created successfully. ' +
+      '<button type="button" class="link" id="btn-print-new-po" style="margin-left:6px;">Print this PO</button></div>';
+    document.getElementById('btn-print-new-po').addEventListener('click', () => printPO(po.PO_NUMBER));
     document.getElementById('form-new').reset();
     resetGlassBlocks();
     updateDescriptionMode();
-    await fetchData();
   }catch(err){
     showBanner('new','error','Could not create PO: ' + err.message);
   }finally{
@@ -1024,6 +1142,9 @@ function openEditModal(poNumber){
   recomputeDebtPreview();
   document.getElementById('modal-bg').classList.add('show');
 }
+document.getElementById('btn-print-po').addEventListener('click', () => {
+  if(editingPoNumber) printPO(editingPoNumber);
+});
 document.getElementById('btn-cancel-edit').addEventListener('click', () => {
   document.getElementById('modal-bg').classList.remove('show');
 });
@@ -1223,5 +1344,7 @@ document.querySelectorAll('.navbtn').forEach(btn => {
   setInterval(fetchData, 180000); // auto-refresh every 3 min
 })();
 </script>
+<div id="print-po-content"></div>
+
 </body>
 </html>
