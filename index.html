@@ -190,33 +190,6 @@
     .toolbar input, .toolbar select{flex:1 1 100%;}
     button.primary, button.secondary{padding:10px 14px; font-size:12.5px;}
   }
-
-  /* Printable PO document */
-  #print-po-content{display:none;}
-  .po-print{font-family:Arial, Helvetica, sans-serif; color:var(--dark); padding:10px;}
-  .po-print-header{display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:28px;}
-  .po-print-header img{height:46px; width:auto;}
-  .po-print-header h1{font-size:20px; color:var(--dark); margin:0; letter-spacing:.5px;}
-  .po-print-meta{display:flex; justify-content:space-between; margin-bottom:22px; font-size:13px;}
-  .po-print-meta .label{color:var(--mid); font-weight:600; display:inline-block; width:110px;}
-  .po-print-meta .ponum{color:var(--deep-green); font-weight:800; font-size:15px;}
-  .po-print-boxes{display:flex; gap:18px; margin-bottom:22px;}
-  .po-print-box{flex:1; border:1px solid var(--border); border-radius:8px; overflow:hidden;}
-  .po-print-box .box-title{background:var(--green); color:var(--white); font-weight:800; font-size:11px; letter-spacing:.5px; padding:6px 12px;}
-  .po-print-box .box-body{padding:12px; font-size:13px; line-height:1.5;}
-  .po-print-box .box-body .name{font-weight:700; margin-bottom:2px;}
-  .po-print table{width:100%; border-collapse:collapse; margin-bottom:22px; font-size:12.5px;}
-  .po-print th{background:var(--green); color:var(--white); text-align:left; padding:8px 10px; font-size:11px; letter-spacing:.3px;}
-  .po-print td{padding:8px 10px; border-bottom:1px solid var(--border);}
-  .po-print .foot-note{font-size:11px; color:var(--mid); margin-top:30px;}
-
-  @media print{
-    #print-po-content:not(:empty){display:block !important;}
-    body:has(#print-po-content:not(:empty)) #app,
-    body:has(#print-po-content:not(:empty)) .modal-bg{
-      display:none !important;
-    }
-  }
 </style>
 </head>
 <body>
@@ -670,13 +643,19 @@ function printPO(poNumber){
   const po = pos.find(p => String(p.PO_NUMBER) === String(poNumber));
   if(!po){ alert('Could not find that PO to print.'); return; }
 
+  const printWindow = window.open('', '_blank');
+  if(!printWindow){
+    alert('Your browser blocked the print window. Please allow pop-ups for this page and try again.');
+    return;
+  }
+
   const logoSrc = document.querySelector('.logo-chip img').src;
   const rows = parsePrintRows(po.DESCRIPTION);
   const rowsHtml = rows.map(r =>
     '<tr><td>' + esc(r.desc) + '</td><td style="text-align:center;">Pcs</td><td style="text-align:center;">' + esc(r.qty) + '</td></tr>'
   ).join('');
 
-  const html =
+  const bodyHtml =
     '<div class="po-print">' +
       '<div class="po-print-header">' +
         '<img src="' + logoSrc + '" alt="GreenHill Products">' +
@@ -720,11 +699,38 @@ function printPO(poNumber){
       '<div class="foot-note">GreenHill Products Inc — generated from the PO Tracker</div>' +
     '</div>';
 
-  document.getElementById('print-po-content').innerHTML = html;
-  const originalTitle = document.title;
-  document.title = '1. PO_' + po.PO_NUMBER;
-  window.print();
-  setTimeout(() => { document.title = originalTitle; }, 1000);
+  const fullHtml =
+    '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
+    '<title>1. PO_' + esc(po.PO_NUMBER) + '</title>' +
+    '<style>' +
+      ':root{--green:#76BC21; --deep-green:#5A9A18; --dark:#1E2A1A; --mid:#7A8C75; --border:#DDE8D8; --white:#FFFFFF;}' +
+      '*{box-sizing:border-box;}' +
+      'body{margin:0; font-family:Arial, Helvetica, sans-serif; color:var(--dark);}' +
+      '.po-print{padding:24px;}' +
+      '.po-print-header{display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:28px;}' +
+      '.po-print-header img{height:46px; width:auto;}' +
+      '.po-print-header h1{font-size:20px; color:var(--dark); margin:0; letter-spacing:.5px;}' +
+      '.po-print-meta{display:flex; justify-content:space-between; margin-bottom:22px; font-size:13px;}' +
+      '.po-print-meta .label{color:var(--mid); font-weight:600; display:inline-block; width:110px;}' +
+      '.po-print-meta .ponum{color:var(--deep-green); font-weight:800; font-size:15px;}' +
+      '.po-print-boxes{display:flex; gap:18px; margin-bottom:22px;}' +
+      '.po-print-box{flex:1; border:1px solid var(--border); border-radius:8px; overflow:hidden;}' +
+      '.po-print-box .box-title{background:var(--green); color:var(--white); font-weight:800; font-size:11px; letter-spacing:.5px; padding:6px 12px;}' +
+      '.po-print-box .box-body{padding:12px; font-size:13px; line-height:1.5;}' +
+      '.po-print-box .box-body .name{font-weight:700; margin-bottom:2px;}' +
+      'table{width:100%; border-collapse:collapse; margin-bottom:22px; font-size:12.5px;}' +
+      'th{background:var(--green); color:var(--white); text-align:left; padding:8px 10px; font-size:11px; letter-spacing:.3px;}' +
+      'td{padding:8px 10px; border-bottom:1px solid var(--border);}' +
+      '.foot-note{font-size:11px; color:var(--mid); margin-top:30px;}' +
+      '@media print{ @page{ margin:0.5in; } }' +
+    '</style></head><body>' +
+    bodyHtml +
+    '<script>window.onload=function(){setTimeout(function(){window.focus();window.print();},150);};<\/script>' +
+    '</body></html>';
+
+  printWindow.document.open();
+  printWindow.document.write(fullHtml);
+  printWindow.document.close();
 }
 
 // ---------- date helpers (Statistics) ----------
@@ -1349,7 +1355,5 @@ document.querySelectorAll('.navbtn').forEach(btn => {
   setInterval(fetchData, 180000); // auto-refresh every 3 min
 })();
 </script>
-<div id="print-po-content"></div>
-
 </body>
 </html>
