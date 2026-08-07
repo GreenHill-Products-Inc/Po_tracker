@@ -211,8 +211,11 @@
   .po-print .foot-note{font-size:11px; color:var(--mid); margin-top:30px;}
 
   @media print{
-    #app, .modal-bg{display:none !important;}
-    #print-po-content{display:block !important;}
+    #print-po-content:not(:empty){display:block !important;}
+    body:has(#print-po-content:not(:empty)) #app,
+    body:has(#print-po-content:not(:empty)) .modal-bg{
+      display:none !important;
+    }
   }
 </style>
 </head>
@@ -718,7 +721,10 @@ function printPO(poNumber){
     '</div>';
 
   document.getElementById('print-po-content').innerHTML = html;
+  const originalTitle = document.title;
+  document.title = '1. PO_' + po.PO_NUMBER;
   window.print();
+  setTimeout(() => { document.title = originalTitle; }, 1000);
 }
 
 // ---------- date helpers (Statistics) ----------
