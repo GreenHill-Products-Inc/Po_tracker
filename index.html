@@ -246,10 +246,23 @@
           Refresh
         </button>
       </div>
+      <div id="bulk-actions-bar" class="toolbar" style="display:none; background:var(--mint); border:1px solid var(--light); border-radius:8px; padding:10px 14px;">
+        <strong id="bulk-selected-count">0 selected</strong>
+        <select id="bulk-statuspo">
+          <option value="PENDING">Set Status PO: PENDING</option>
+          <option value="DELIVERED">Set Status PO: DELIVERED</option>
+          <option value="PARTIAL">Set Status PO: PARTIAL</option>
+          <option value="BACKORDER">Set Status PO: BACKORDER</option>
+          <option value="CANCELED">Set Status PO: CANCELED</option>
+        </select>
+        <button class="primary" id="btn-bulk-apply">Apply</button>
+        <button class="secondary" id="btn-bulk-clear">Clear selection</button>
+      </div>
       <div class="tablewrap">
         <table>
           <thead>
             <tr>
+              <th style="width:32px;"><input type="checkbox" id="select-all-rows"></th>
               <th>Customer</th><th>Address</th><th>Lot / House</th><th>Phases</th><th>Vendor</th>
               <th>PO Number</th><th>PO Creation Date</th><th>Vendor Lead Time</th><th>PO Confirmation ETA</th>
               <th>Status</th><th>Actual Delivery Time</th><th>Estimated Overdue</th><th>Real Delivery Time</th>
@@ -269,14 +282,14 @@
       <div id="banner-new"></div>
       <div class="card">
         <form id="form-new">
-          <div class="grid2">
-            <div class="field"><label>Customer</label><input type="text" id="f-customer" required></div>
-            <div class="field"><label>Address</label><input type="text" id="f-address" required></div>
-          </div>
-          <div class="grid2">
-            <div class="field"><label>Lot / House</label><input type="text" id="f-lot"></div>
-            <div class="field"><label>Phases</label><input type="text" id="f-phases" required style="text-transform:uppercase;"></div>
-          </div>
+          <div class="section-title">Customer(s)</div>
+          <div class="hint" style="margin-bottom:10px;">If this PO covers material for more than one house, click "+ Add customer" to add another — they'll all share the same PO Number, Vendor, and dates.</div>
+          <div id="customer-blocks"></div>
+          <button type="button" class="link" id="btn-add-customer" style="margin:6px 0 22px 0;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+            Add customer
+          </button>
+
           <div class="grid2">
             <div class="field">
               <label>Vendor</label>
@@ -398,6 +411,8 @@
     <div class="modal-status-line">
       <span class="lbl">Status (auto):</span>
       <span class="light" id="modal-status-light"><span class="dot none"></span><span>—</span></span>
+      <span class="lbl" style="margin-left:16px;">Last updated:</span>
+      <span id="modal-last-updated">—</span>
     </div>
     <form id="form-edit" novalidate>
       <div class="grid2">
@@ -484,6 +499,7 @@ let vendors = [];
 let editingPoNumber = null;
 let lastFetchError = '';
 let activeScorecard = null;
+let selectedPoNumbers = new Set();
 
 // ---------- sync status ----------
 function setSync(state){
@@ -798,6 +814,7 @@ function clearStandardFilters(){
   document.getElementById('filter-vendor').value = '';
   document.getElementById('filter-datefrom').value = '';
   document.getElementById('filter-dateto').value = '';
+  saveDashboardFilters();
 }
 
 function applyScorecardFilter(key){
@@ -812,6 +829,7 @@ function applyScorecardFilter(key){
   clearStandardFilters();
   if(key === 'backorder'){
     document.getElementById('filter-statuspo').value = 'BACKORDER';
+    saveDashboardFilters();
   }
   renderScorecards();
   renderTable();
@@ -882,6 +900,7 @@ function renderTable(){
   if(rows.length === 0){
     tbody.innerHTML = '';
     emptyEl.style.display = 'block';
+    updateBulkBar();
     return;
   }
   emptyEl.style.display = 'none';
@@ -891,7 +910,9 @@ function renderTable(){
     const statusPo = p.STATUS_PO || 'PENDING';
     const overdueDays = computeOverdueDays(p);
     const rowClass = light.level === 'red' ? 'sem-red' : (light.level === 'yellow' ? 'sem-yellow' : '');
+    const checked = selectedPoNumbers.has(String(p.PO_NUMBER)) ? 'checked' : '';
     return '<tr class="' + rowClass + '" data-po="' + esc(p.PO_NUMBER) + '">' +
+      '<td><input type="checkbox" class="row-select" data-po="' + esc(p.PO_NUMBER) + '" ' + checked + '></td>' +
       '<td>' + esc(p.CUSTOMER) + '</td>' +
       '<td>' + esc(p.ADDRESS) + '</td>' +
       '<td>' + esc(p.LOT_HOUSE) + '</td>' +
@@ -911,9 +932,85 @@ function renderTable(){
   }).join('');
 
   Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
-    tr.addEventListener('click', () => openEditModal(tr.getAttribute('data-po')));
+    tr.addEventListener('click', (e) => {
+      if(e.target.classList.contains('row-select')) return;
+      openEditModal(tr.getAttribute('data-po'));
+    });
   });
+  Array.from(tbody.querySelectorAll('.row-select')).forEach(cb => {
+    cb.addEventListener('click', (e) => e.stopPropagation());
+    cb.addEventListener('change', () => {
+      const po = cb.getAttribute('data-po');
+      if(cb.checked) selectedPoNumbers.add(po); else selectedPoNumbers.delete(po);
+      updateBulkBar();
+    });
+  });
+  updateBulkBar();
 }
+
+function updateBulkBar(){
+  const bar = document.getElementById('bulk-actions-bar');
+  const count = selectedPoNumbers.size;
+  document.getElementById('bulk-selected-count').textContent = count + (count === 1 ? ' selected' : ' selected');
+  bar.style.display = count > 0 ? 'flex' : 'none';
+  const selectAll = document.getElementById('select-all-rows');
+  const rowBoxes = Array.from(document.querySelectorAll('.row-select'));
+  selectAll.checked = rowBoxes.length > 0 && rowBoxes.every(cb => cb.checked);
+}
+
+document.getElementById('select-all-rows').addEventListener('change', function(){
+  document.querySelectorAll('.row-select').forEach(cb => {
+    cb.checked = this.checked;
+    const po = cb.getAttribute('data-po');
+    if(this.checked) selectedPoNumbers.add(po); else selectedPoNumbers.delete(po);
+  });
+  updateBulkBar();
+});
+
+document.getElementById('btn-bulk-clear').addEventListener('click', () => {
+  selectedPoNumbers.clear();
+  renderTable();
+});
+
+document.getElementById('btn-bulk-apply').addEventListener('click', async () => {
+  if(selectedPoNumbers.size === 0) return;
+  const newStatus = document.getElementById('bulk-statuspo').value;
+  const btn = document.getElementById('btn-bulk-apply');
+  const targets = Array.from(selectedPoNumbers);
+  btn.disabled = true;
+  btn.textContent = 'Applying...';
+  try{
+    for(const poNumber of targets){
+      const existing = pos.find(p => String(p.PO_NUMBER) === String(poNumber));
+      if(!existing) continue;
+      await writeData({ action:'updatePo', po: {
+        PO_NUMBER: poNumber,
+        PO_CONFIRMATION_ETA: existing.PO_CONFIRMATION_ETA || '',
+        STATUS_PO: newStatus,
+        ACTUAL_DELIVERY_TIME: existing.ACTUAL_DELIVERY_TIME || '',
+        REAL_DELIVERY_TIME: existing.REAL_DELIVERY_TIME || '',
+        ESTIMATED_OVERDUE: existing.ESTIMATED_OVERDUE || '',
+        DESCRIPTION: existing.DESCRIPTION || '',
+        COST_OF_PO: existing.COST_OF_PO || '',
+        NOTES: existing.NOTES || '',
+        DESCRIPTION_2: existing.DESCRIPTION_2 || '', INVOICE_1: existing.INVOICE_1 || '',
+        DESCRIPTION_3: existing.DESCRIPTION_3 || '', INVOICE_2: existing.INVOICE_2 || '',
+        DESCRIPTION_4: existing.DESCRIPTION_4 || '', INVOICE_3: existing.INVOICE_3 || '',
+        DESCRIPTION_5: existing.DESCRIPTION_5 || '', INVOICE_4: existing.INVOICE_4 || '',
+        DESCRIPTION_6: existing.DESCRIPTION_6 || '',
+        DEBT: existing.DEBT || ''
+      }});
+    }
+    selectedPoNumbers.clear();
+    showBanner('dashboard','info','Updated Status PO for ' + targets.length + ' order' + (targets.length===1?'':'s') + '.');
+    await fetchData();
+  }catch(err){
+    showBanner('dashboard','error','Bulk update failed partway through: ' + err.message + '. Some orders may already be updated — refresh to check.');
+  }finally{
+    btn.disabled = false;
+    btn.textContent = 'Apply';
+  }
+});
 
 function resetNewPoDefaults(){
   document.getElementById('f-ponumber').value = nextPoNumber();
@@ -927,6 +1024,60 @@ function updateLeadTimePreview(){
 }
 
 // ---------- new PO ----------
+
+let customerBlockSeq = 0;
+
+function createCustomerBlock(){
+  customerBlockSeq++;
+  const div = document.createElement('div');
+  div.className = 'card customer-block';
+  div.dataset.blockId = 'cb-' + customerBlockSeq;
+
+  const row1 = document.createElement('div');
+  row1.className = 'grid2';
+  row1.innerHTML =
+    '<div class="field"><label>Customer</label><input type="text" class="c-customer" required></div>' +
+    '<div class="field"><label>Address</label><input type="text" class="c-address" required></div>';
+
+  const row2 = document.createElement('div');
+  row2.className = 'grid2';
+  row2.innerHTML =
+    '<div class="field"><label>Lot / House</label><input type="text" class="c-lot"></div>' +
+    '<div class="field"><label>Phases</label><input type="text" class="c-phases" style="text-transform:uppercase;"></div>';
+
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.className = 'secondary';
+  removeBtn.textContent = 'Remove this customer';
+  removeBtn.addEventListener('click', () => {
+    if(document.querySelectorAll('#customer-blocks .customer-block').length > 1){
+      div.remove();
+    }
+  });
+
+  div.appendChild(row1);
+  div.appendChild(row2);
+  div.appendChild(removeBtn);
+
+  // Live-uppercase the Phases field, same as the rest of the app
+  div.querySelector('.c-phases').addEventListener('input', function(){
+    const pos = this.selectionStart;
+    this.value = this.value.toUpperCase();
+    this.setSelectionRange(pos, pos);
+  });
+
+  return div;
+}
+
+function resetCustomerBlocks(){
+  const container = document.getElementById('customer-blocks');
+  container.innerHTML = '';
+  container.appendChild(createCustomerBlock());
+}
+
+document.getElementById('btn-add-customer').addEventListener('click', () => {
+  document.getElementById('customer-blocks').appendChild(createCustomerBlock());
+});
 
 // These vendors get a structured glass-description form instead of free text.
 const GLASS_VENDORS = ['aldora (3/16 glass)', 'aldora (1/4 and 3/8 glass)', 'basco'];
@@ -1026,12 +1177,6 @@ document.getElementById('btn-add-glass').addEventListener('click', () => {
   document.getElementById('glass-blocks').appendChild(createGlassBlock());
 });
 
-document.getElementById('f-phases').addEventListener('input', function(){
-  const pos = this.selectionStart;
-  this.value = this.value.toUpperCase();
-  this.setSelectionRange(pos, pos);
-});
-
 document.getElementById('f-vendor').addEventListener('change', () => {
   updateLeadTimePreview();
   updateDescriptionMode();
@@ -1041,31 +1186,68 @@ document.getElementById('form-new').addEventListener('submit', async (e) => {
   e.preventDefault();
   const vendorName = document.getElementById('f-vendor').value;
   if(!vendorName){ showBanner('new','error','Please select a vendor.'); return; }
+
+  const customerBlocks = Array.from(document.querySelectorAll('#customer-blocks .customer-block'));
+  for(const block of customerBlocks){
+    if(!block.querySelector('.c-customer').value.trim() || !block.querySelector('.c-address').value.trim()){
+      showBanner('new','error','Please fill in Customer and Address for every customer added.');
+      return;
+    }
+  }
+
+  // Warn if two customer blocks in this same submission look identical —
+  // usually means someone clicked "Add customer" by mistake.
+  const seen = new Set();
+  let hasDuplicate = false;
+  customerBlocks.forEach(block => {
+    const key = [
+      block.querySelector('.c-customer').value.trim().toLowerCase(),
+      block.querySelector('.c-address').value.trim().toLowerCase(),
+      block.querySelector('.c-lot').value.trim().toLowerCase()
+    ].join('|');
+    if(seen.has(key)) hasDuplicate = true;
+    seen.add(key);
+  });
+  if(hasDuplicate){
+    const proceed = confirm('Two of the customers you entered look identical (same Customer, Address, and Lot/House). Continue anyway?');
+    if(!proceed) return;
+  }
+
   const btn = document.getElementById('btn-submit-po');
   btn.disabled = true;
   const description = isGlassVendor(vendorName)
     ? buildGlassDescription()
     : document.getElementById('f-description-plain').value;
-  const po = {
-    CUSTOMER: document.getElementById('f-customer').value,
-    ADDRESS: document.getElementById('f-address').value,
-    LOT_HOUSE: document.getElementById('f-lot').value,
-    PHASES: document.getElementById('f-phases').value,
+  // Recompute the PO Number fresh right before saving, in case time has
+  // passed (or someone else created a PO) since this form was opened.
+  const poNumber = nextPoNumber();
+  const sharedFields = {
     VENDOR: vendorName,
-    PO_NUMBER: document.getElementById('f-ponumber').value,
+    PO_NUMBER: poNumber,
     PO_CREATION_DATE: todayISO(),
     VENDOR_LEAD_TIME: calcLeadTimeDate(vendorName),
     STATUS_PO: 'PENDING',
     DESCRIPTION: description
   };
+
   try{
-    await writeData({ action:'addPo', po });
+    for(const block of customerBlocks){
+      const po = Object.assign({
+        CUSTOMER: block.querySelector('.c-customer').value,
+        ADDRESS: block.querySelector('.c-address').value,
+        LOT_HOUSE: block.querySelector('.c-lot').value,
+        PHASES: block.querySelector('.c-phases').value
+      }, sharedFields);
+      await writeData({ action:'addPo', po });
+    }
     await fetchData();
+    const countNote = customerBlocks.length > 1 ? (' across ' + customerBlocks.length + ' customers') : '';
     document.getElementById('banner-new').innerHTML =
-      '<div class="banner info">PO ' + esc(po.PO_NUMBER) + ' created successfully. ' +
+      '<div class="banner info">PO ' + esc(poNumber) + ' created successfully' + countNote + '. ' +
       '<button type="button" class="link" id="btn-print-new-po" style="margin-left:6px;">Print this PO</button></div>';
-    document.getElementById('btn-print-new-po').addEventListener('click', () => printPO(po.PO_NUMBER));
+    document.getElementById('btn-print-new-po').addEventListener('click', () => printPO(poNumber));
     document.getElementById('form-new').reset();
+    resetCustomerBlocks();
     resetGlassBlocks();
     updateDescriptionMode();
   }catch(err){
@@ -1134,6 +1316,7 @@ function openEditModal(poNumber){
   const light = computeStatusLight(po);
   document.getElementById('modal-status-light').innerHTML =
     '<span class="dot ' + light.level + '"></span><span>' + esc(light.label) + '</span>';
+  document.getElementById('modal-last-updated').textContent = po.LAST_UPDATED ? esc(po.LAST_UPDATED) : 'Not tracked yet — save once to start recording';
   document.getElementById('e-confeta').value = po.PO_CONFIRMATION_ETA || '';
   document.getElementById('e-statuspo').value = po.STATUS_PO || 'PENDING';
   document.getElementById('e-actualdelivery').value = po.ACTUAL_DELIVERY_TIME || '';
@@ -1308,10 +1491,32 @@ function renderStats(){
 }
 
 // ---------- filters ----------
-['filter-search','filter-statuspo','filter-vendor','filter-datefrom','filter-dateto'].forEach(id => {
+const DASHBOARD_FILTER_IDS = ['filter-search','filter-statuspo','filter-vendor','filter-datefrom','filter-dateto'];
+
+function saveDashboardFilters(){
+  try{
+    const state = {};
+    DASHBOARD_FILTER_IDS.forEach(id => { state[id] = document.getElementById(id).value; });
+    localStorage.setItem('po_tracker_dashboard_filters', JSON.stringify(state));
+  }catch(e){ /* localStorage unavailable — filters just won't persist */ }
+}
+
+function loadDashboardFilters(){
+  try{
+    const raw = localStorage.getItem('po_tracker_dashboard_filters');
+    if(!raw) return;
+    const state = JSON.parse(raw);
+    DASHBOARD_FILTER_IDS.forEach(id => {
+      if(state[id] !== undefined) document.getElementById(id).value = state[id];
+    });
+  }catch(e){ /* ignore malformed/unavailable storage */ }
+}
+
+DASHBOARD_FILTER_IDS.forEach(id => {
   const handler = () => {
     activeScorecard = null;
     document.querySelectorAll('.scorecard').forEach(el => el.classList.remove('active'));
+    saveDashboardFilters();
     renderTable();
   };
   document.getElementById(id).addEventListener('input', handler);
@@ -1341,6 +1546,8 @@ document.querySelectorAll('.navbtn').forEach(btn => {
 });
 
 // ---------- init ----------
+resetCustomerBlocks();
+loadDashboardFilters();
 (async function init(){
   const fromDefault = new Date();
   fromDefault.setDate(fromDefault.getDate() - 30);
