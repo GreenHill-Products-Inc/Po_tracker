@@ -458,6 +458,10 @@
         <div class="field"><label>Debt (Cost of PO − Invoices 1-4)</label><input type="number" step="0.01" id="e-debt" disabled></div>
       </div>
       <div class="modal-actions">
+        <button type="button" class="secondary" id="btn-print-sticker">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12h8M8 16h5"/></svg>
+          Print Sticker
+        </button>
         <button type="button" class="secondary" id="btn-print-po">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
           Print PO
@@ -487,6 +491,20 @@
   </div>
 </div>
 
+<div class="modal-bg" id="modal-editvendor-bg">
+  <div class="modal" style="max-width:420px;">
+    <h2>Edit vendor</h2>
+    <form id="form-edit-vendor">
+      <div class="field"><label>Vendor name</label><input type="text" id="ev-name" required></div>
+      <div class="field"><label>Lead time (days)</label><input type="number" min="0" id="ev-leadtime" required></div>
+      <div class="modal-actions">
+        <button type="button" class="secondary" id="btn-cancel-editvendor">Cancel</button>
+        <button type="submit" class="primary">Save changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
 // The connection URL is fixed in the source code on purpose — there is no
 // in-app way to view or change it. To point this app at a different Apps
@@ -500,6 +518,7 @@ let editingPoNumber = null;
 let lastFetchError = '';
 let activeScorecard = null;
 let selectedPoNumbers = new Set();
+let editingVendorOriginalName = null;
 
 // ---------- sync status ----------
 function setSync(state){
@@ -653,6 +672,29 @@ function parsePrintRows(description){
     if(m) return { desc: m[2], qty: m[1] };
     return { desc: item, qty: '' };
   });
+}
+
+// Downloads a plain-text file with Customer / Address+Lot / Phases for every
+// customer under this PO Number — easy to copy into a label-printing program.
+function printSticker(poNumber){
+  const rows = pos.filter(p => String(p.PO_NUMBER) === String(poNumber));
+  if(rows.length === 0){ alert('Could not find that PO to print a sticker for.'); return; }
+
+  const blocks = rows.map(p => {
+    const addressLot = [p.ADDRESS || '', p.LOT_HOUSE ? ('Lot ' + p.LOT_HOUSE) : ''].filter(Boolean).join(' ');
+    return [p.CUSTOMER || '', addressLot, p.PHASES || ''].join('\n');
+  });
+  const content = blocks.join('\n\n');
+
+  const blob = new Blob([content], { type:'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'Sticker_PO_' + poNumber + '.txt';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 function printPO(poNumber){
@@ -865,8 +907,22 @@ function renderVendorList(){
   const el = document.getElementById('vendor-list');
   if(vendors.length === 0){ el.innerHTML = '<div class="empty">No vendors yet. Add the first one above.</div>'; return; }
   el.innerHTML = vendors.map(v =>
-    '<div class="vendorrow"><div><strong>' + esc(v.VENDOR_NAME) + '</strong></div><div>' + esc(v.LEAD_TIME_DAYS) + ' days lead time</div></div>'
+    '<div class="vendorrow"><div><strong>' + esc(v.VENDOR_NAME) + '</strong></div>' +
+    '<div style="display:flex; align-items:center; gap:14px;">' +
+      '<span>' + esc(v.LEAD_TIME_DAYS) + ' days lead time</span>' +
+      '<button type="button" class="secondary btn-edit-vendor" data-name="' + esc(v.VENDOR_NAME) + '" data-leadtime="' + esc(v.LEAD_TIME_DAYS) + '">Edit</button>' +
+    '</div></div>'
   ).join('');
+  document.querySelectorAll('.btn-edit-vendor').forEach(btn => {
+    btn.addEventListener('click', () => openEditVendorModal(btn.dataset.name, btn.dataset.leadtime));
+  });
+}
+
+function openEditVendorModal(name, leadtime){
+  editingVendorOriginalName = name;
+  document.getElementById('ev-name').value = name;
+  document.getElementById('ev-leadtime').value = leadtime;
+  document.getElementById('modal-editvendor-bg').classList.add('show');
 }
 
 function renderTable(){
@@ -1295,6 +1351,27 @@ document.getElementById('form-vendor').addEventListener('submit', async (e) => {
   }
 });
 
+document.getElementById('btn-cancel-editvendor').addEventListener('click', () => {
+  document.getElementById('modal-editvendor-bg').classList.remove('show');
+});
+document.getElementById('form-edit-vendor').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const newName = document.getElementById('ev-name').value.trim();
+  const newLeadtime = document.getElementById('ev-leadtime').value;
+  try{
+    await writeData({
+      action:'updateVendor',
+      originalName: editingVendorOriginalName,
+      vendor:{ VENDOR_NAME:newName, LEAD_TIME_DAYS:newLeadtime }
+    });
+    document.getElementById('modal-editvendor-bg').classList.remove('show');
+    await fetchData();
+    showBanner('vendors','info','Vendor updated.');
+  }catch(err){
+    alert('Could not update vendor: ' + err.message);
+  }
+});
+
 // ---------- edit PO modal ----------
 // Debt is never entered by hand — it's always Cost of PO minus Invoices 1-4.
 function recomputeDebtPreview(){
@@ -1336,6 +1413,9 @@ function openEditModal(poNumber){
   recomputeDebtPreview();
   document.getElementById('modal-bg').classList.add('show');
 }
+document.getElementById('btn-print-sticker').addEventListener('click', () => {
+  if(editingPoNumber) printSticker(editingPoNumber);
+});
 document.getElementById('btn-print-po').addEventListener('click', () => {
   if(editingPoNumber) printPO(editingPoNumber);
 });
